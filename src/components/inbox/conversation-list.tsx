@@ -13,7 +13,7 @@ import type { Conversation, ConversationStatus, Tag } from "@/types";
 import { Search, ChevronDown, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useLocale, useTranslations } from "next-intl";
-import { channelLabel, channelLabels, type InboxChannel } from "@/lib/social/channels";
+import { channelLabel, channelLabels, socialSenderLabel, type InboxChannel } from "@/lib/social/channels";
 import { getDateLocale } from "@/i18n/date-locale";
 import { Input } from "@/components/ui/input";
 import {
@@ -458,7 +458,11 @@ function ConversationItem({
 }: ConversationItemProps) {
   const dateLocale = getDateLocale(useLocale());
   const contact = conversation.contact;
-  const displayName = contact?.name || contact?.phone || t("unknown");
+  const displayName =
+    contact?.name ||
+    socialSenderLabel(conversation.channel, conversation.channel_sender_id) ||
+    contact?.phone ||
+    t("unknown");
   const initials = displayName.charAt(0).toUpperCase();
 
   const handleClick = useCallback(() => {

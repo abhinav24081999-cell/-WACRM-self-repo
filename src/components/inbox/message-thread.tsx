@@ -7,7 +7,7 @@ import { usePresence } from "@/hooks/use-presence";
 import { PresenceDot } from "@/components/presence/presence-dot";
 import { presenceLabel } from "@/lib/presence";
 import { cn } from "@/lib/utils";
-import { channelLabel, isSocialChannel } from "@/lib/social/channels";
+import { channelLabel, isSocialChannel, socialSenderLabel } from "@/lib/social/channels";
 import type {
   Conversation,
   Message,
@@ -868,7 +868,10 @@ export function MessageThread({
   }, [reactions]);
 
   const contactDisplayName =
-    contact?.name || (contact ? contactHandle(contact) : "") || t("customer");
+    contact?.name ||
+    socialSenderLabel(conversation?.channel, conversation?.channel_sender_id) ||
+    (contact ? contactHandle(contact) : "") ||
+    t("customer");
 
   // Author label for a quoted message: "You" when we sent the parent,
   // contact name when the customer sent it.
@@ -996,7 +999,7 @@ export function MessageThread({
 
   const social = isSocialChannel(conversation.channel);
   const source = channelLabel(conversation.channel, conversation.channel_account_label);
-  const displayName = contact.name || contactHandle(contact) || t("customer");
+  const displayName = contactDisplayName;
   const messageGroups = groupMessagesByDate(messages);
   const currentStatus = STATUS_OPTIONS.find(
     (s) => s.value === conversation.status

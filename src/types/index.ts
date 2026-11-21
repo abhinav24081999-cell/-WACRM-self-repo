@@ -172,6 +172,7 @@ export interface Conversation {
   id: string;
   channel?: import('@/lib/social/channels').InboxChannel;
   channel_account_label?: string | null;
+  channel_sender_id?: string | null;
   user_id: string;
   contact_id: string;
   status: ConversationStatus;
