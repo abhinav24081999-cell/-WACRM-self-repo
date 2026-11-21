@@ -1,9 +1,10 @@
 # Instagram and Messenger inbox preview
 
-Use a preview database that has the repository migrations through
-`061_social_inbox.sql` and a WACRM test workspace. Do not point a development
-webhook at the production database. The first version supports one connection
-per social channel per deployment. Each connection is bound to one workspace.
+Apply `20261121072456_social_inbox.sql` before setting up the channels.
+When the preview shares the WACRM Supabase project, use a separate test login
+and workspace in that project. Set both channel connections to the test
+workspace so the production inbox does not receive preview messages.
+The first version supports one connection per social channel per deployment.
 
 Set these server-only environment variables for the preview branch:
 
