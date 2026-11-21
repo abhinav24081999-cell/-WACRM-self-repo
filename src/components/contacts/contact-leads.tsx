@@ -21,7 +21,7 @@ const attributionFields = [
   'ad_group_id', 'ad_group_name', 'ad_id', 'ad_name', 'ctwa_clid',
   'gclid', 'gbraid', 'wbraid', 'utm_source', 'utm_medium', 'utm_campaign',
   'utm_content', 'utm_term', 'referral_url', 'referral_source', 'referral_type',
-  'referral_ref', 'referral_headline', 'meta_page_id',
+  'referral_ref', 'referral_headline', 'meta_page_id', 'landing_url',
 ] as const;
 
 type Status = (typeof statuses)[number];
@@ -240,7 +240,7 @@ function LeadForm({ accountId, contactId, lead, canEdit, onSaved, onBack }: Cont
         <div className="space-y-1">
           <Label htmlFor={`${fieldId}-platform`}>{t('adsPlatform')}</Label>
           <select id={`${fieldId}-platform`} name="ads_platform" className={selectClass} defaultValue={lead?.ads_platform ?? ''}>
-            <option value="">{t('unspecified')}</option>
+            <option value="">{t(lead?.source === 'website_form' ? 'unknownAttribution' : 'unspecified')}</option>
             <option value="meta">Meta Ads</option>
             <option value="google">Google Ads</option>
           </select>
@@ -257,8 +257,10 @@ function LeadForm({ accountId, contactId, lead, canEdit, onSaved, onBack }: Cont
                     id={`${fieldId}-${field}`}
                     name={field}
                     defaultValue={typeof initial === 'string' ? initial : ''}
-                    readOnly={field === 'external_lead_id' && lead?.meta_event_key?.startsWith('meta_instant_form:')}
-                    maxLength={field === 'referral_url' ? 2048 : 512}
+                    readOnly={field === 'external_lead_id' && Boolean(
+                      lead?.meta_event_key?.startsWith('meta_instant_form:') || lead?.attribution.webhook_source,
+                    )}
+                    maxLength={field === 'referral_url' || field === 'landing_url' ? 2048 : 512}
                   />
                 </div>
               );

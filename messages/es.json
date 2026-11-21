@@ -624,7 +624,8 @@
       "notLinkedToAccount": "Tu perfil no está vinculado a una cuenta."
     },
     "leads": {
-      "formAnswers": "Respuestas del formulario instantáneo",
+      "formAnswers": "Respuestas del formulario",
+      "unknownAttribution": "Desconocida",
       "add": "Añadir lead",
       "back": "Volver a los leads",
       "loading": "Cargando…",
@@ -695,7 +696,8 @@
         "referral_type": "Tipo de referencia",
         "referral_ref": "Código de referencia",
         "referral_headline": "Titular de la referencia",
-        "meta_page_id": "ID de página de Meta"
+        "meta_page_id": "ID de página de Meta",
+        "landing_url": "URL de la página de destino"
       }
     },
     "detailView": {

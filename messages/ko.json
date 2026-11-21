@@ -624,7 +624,8 @@
       "notLinkedToAccount": "프로필이 계정에 연결되어 있지 않습니다."
     },
     "leads": {
-      "formAnswers": "인스턴트 양식 답변",
+      "formAnswers": "양식 답변",
+      "unknownAttribution": "알 수 없음",
       "add": "리드 추가",
       "back": "리드 목록으로",
       "loading": "불러오는 중…",
@@ -695,7 +696,8 @@
         "referral_type": "참조 유형",
         "referral_ref": "참조 코드",
         "referral_headline": "참조 제목",
-        "meta_page_id": "Meta 페이지 ID"
+        "meta_page_id": "Meta 페이지 ID",
+        "landing_url": "랜딩 페이지 URL"
       }
     },
     "detailView": {

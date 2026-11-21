@@ -637,7 +637,8 @@
       "adsPlatform": "Ad platform",
       "unspecified": "Unspecified",
       "attribution": "Ad attribution",
-      "formAnswers": "Instant Form answers",
+      "formAnswers": "Form answers",
+      "unknownAttribution": "Unknown",
       "titleRequired": "Enter a lead title.",
       "saveFailed": "Could not save the lead.",
       "stale": "The lead changed since you opened it. Go back and reopen it to see the latest version.",
@@ -695,7 +696,8 @@
         "referral_type": "Referral type",
         "referral_ref": "Referral code",
         "referral_headline": "Referral headline",
-        "meta_page_id": "Meta Page ID"
+        "meta_page_id": "Meta Page ID",
+        "landing_url": "Landing page URL"
       }
     },
     "detailView": {
