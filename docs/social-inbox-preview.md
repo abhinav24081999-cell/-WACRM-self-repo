@@ -43,3 +43,20 @@ This preview supports inbound text and manual text replies within the standard
 24-hour window. It shows a placeholder for attachments and other unsupported
 events. Contact linking across channels, media transfer, read receipts, and
 extended Meta reply windows are outside this version.
+
+### Instagram inbound delivery on a protected preview
+
+The Bankshakha preview uses the `instagram-inbox` Supabase Edge Function
+for inbound DMs. Include the function's `index.mjs`, the shared
+`_shared/social-webhook.ts` parser and a deployment-specific
+`instagram-inbox/config.json` when deploying the function. Configure
+`accountId`, `accountLabel`, `workspaceId` and the SHA-256 hex digest of
+the Meta verify token as `verifyTokenHash`. Keep the sample config empty
+in Git. Set the Meta App Secret as the Supabase Edge Function secret
+`WACRM_INSTAGRAM_APP_SECRET`.
+
+Deploy this receiver with gateway JWT verification disabled so Meta can
+call it. It authenticates verification requests with the token, and
+delivered events with Meta's signature, before calling the existing
+`record_social_message` RPC. Point the Instagram webhook at the function's
+HTTPS URL. The Vercel settings still control replies and username lookups.
