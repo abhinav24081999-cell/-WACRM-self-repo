@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { SocialChannel } from './channels'
 
-export { readMessages } from '../../../supabase/functions/_shared/social-webhook'
+export { readMessages, readAdReferrals, socialLeadArgs } from '../../../supabase/functions/_shared/social-webhook'
 
 const graphBase = 'https://graph.facebook.com/v27.0'
 const replyWindowMs = 24 * 60 * 60 * 1000

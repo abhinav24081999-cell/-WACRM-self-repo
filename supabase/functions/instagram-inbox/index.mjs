@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { Buffer } from 'node:buffer'
-import { readMessages } from '../_shared/social-webhook.ts'
+import { readAdReferrals, readMessages, socialLeadArgs } from '../_shared/social-webhook.ts'
 import config from './config.json' with { type: 'json' }
 
 const maxBodyBytes = 256 * 1024
@@ -47,29 +47,38 @@ Deno.serve(async (request) => {
     return new Response(null, { status: 400 })
   }
   try {
-    for (const message of readMessages(payload, 'instagram', config.accountId)) {
-      const response = await fetch(`${supabaseUrl}/rest/v1/rpc/record_social_message`, {
+    async function record(name, args) {
+      const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${name}`, {
         method: 'POST',
         headers: {
           apikey: serviceKey,
           Authorization: `Bearer ${serviceKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          p_account_id: config.workspaceId,
-          p_channel: 'instagram',
-          p_channel_account_id: config.accountId,
-          p_channel_account_label: config.accountLabel,
-          p_sender_id: message.senderId,
-          p_message_id: message.messageId,
-          p_text: message.text,
-          p_sent_at: message.sentAt,
-          p_outgoing: message.outgoing,
-          p_agent_id: null,
-        }),
+        body: JSON.stringify(args),
         signal: AbortSignal.timeout(5000),
       })
       if (!response.ok) throw new Error(`RPC status ${response.status}`)
+    }
+    for (const message of readMessages(payload, 'instagram', config.accountId)) {
+      await record('record_social_message', {
+        p_account_id: config.workspaceId,
+        p_channel: 'instagram',
+        p_channel_account_id: config.accountId,
+        p_channel_account_label: config.accountLabel,
+        p_sender_id: message.senderId,
+        p_message_id: message.messageId,
+        p_text: message.text,
+        p_sent_at: message.sentAt,
+        p_outgoing: message.outgoing,
+        p_agent_id: null,
+      })
+    }
+    if (config.workspaceId === Deno.env.get('META_LEAD_WORKSPACE_ID')?.trim()) {
+      const adsToken = Deno.env.get('META_LEAD_ADS_ACCESS_TOKEN')?.trim()
+      for (const referral of readAdReferrals(payload, 'instagram', config.accountId).values()) {
+        await record('record_meta_social_lead', await socialLeadArgs(referral, 'instagram', config, adsToken))
+      }
     }
   } catch (error) {
     console.error('[instagram-inbox] Could not persist Meta delivery', error instanceof Error ? error.name : 'Unknown')

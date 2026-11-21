@@ -1,20 +1,36 @@
+import { enrichAd, metaText, referralAttribution } from './meta-ad-attribution.ts'
+
 interface MetaDelivery {
   object?: string
   entry?: {
     id?: string
-    messaging?: {
-      sender?: { id?: string }
-      recipient?: { id?: string }
-      timestamp?: number
-      message?: {
-        mid?: string
-        text?: string
-        is_echo?: boolean
-        is_deleted?: boolean
-        attachments?: unknown[]
-      }
-    }[]
+    messaging?: SocialEvent[]
+    changes?: { field?: string; value?: SocialEvent }[]
   }[]
+}
+
+interface SocialEvent {
+  sender?: { id?: string }
+  recipient?: { id?: string }
+  timestamp?: number
+  is_self?: boolean
+  referral?: Record<string, unknown>
+  postback?: { mid?: string; referral?: Record<string, unknown> }
+  message?: {
+    mid?: string
+    text?: string
+    is_echo?: boolean
+    is_deleted?: boolean
+    attachments?: unknown[]
+    referral?: Record<string, unknown>
+  }
+}
+
+function eventsFor(entry: NonNullable<MetaDelivery['entry']>[number], fields: string[]) {
+  const fieldsWithEvents = Array.isArray(entry.changes) ? entry.changes.filter(change =>
+    fields.includes(change?.field ?? ''),
+  ).map(change => change.value) : []
+  return [...(Array.isArray(entry.messaging) ? entry.messaging : []), ...fieldsWithEvents]
 }
 
 export function readMessages(payload: MetaDelivery | null, channel: 'instagram' | 'messenger', accountId: string) {
@@ -23,10 +39,10 @@ export function readMessages(payload: MetaDelivery | null, channel: 'instagram' 
 
   if (!Array.isArray(payload.entry)) return messages
   for (const entry of payload.entry) {
-    if (!Array.isArray(entry?.messaging) || (channel === 'messenger' && entry.id !== accountId)) continue
-    for (const event of entry.messaging) {
+    if (!entry || (channel === 'messenger' && entry.id !== accountId)) continue
+    for (const event of eventsFor(entry, ['messages'])) {
       const message = event?.message
-      if (typeof message?.mid !== 'string' || !message.mid || message.is_deleted) continue
+      if (!event || typeof message?.mid !== 'string' || !message.mid || message.is_deleted) continue
       const outgoing = message.is_echo === true
       const senderId = outgoing ? event.recipient?.id : event.sender?.id
       const receivingAccount = outgoing ? event.sender?.id : event.recipient?.id
@@ -44,4 +60,47 @@ export function readMessages(payload: MetaDelivery | null, channel: 'instagram' 
     }
   }
   return messages
+}
+
+export function readAdReferrals(payload: MetaDelivery | null, channel: 'instagram' | 'messenger', accountId: string) {
+  const referrals = new Map<string, { senderId: string; eventKey: string; attribution: Record<string, string> }>()
+  if (payload?.object !== (channel === 'messenger' ? 'page' : 'instagram') || !Array.isArray(payload.entry)) return referrals
+  for (const entry of payload.entry) {
+    if (!entry || (channel === 'messenger' && entry.id !== accountId)) continue
+    for (const event of eventsFor(entry, ['messages', 'messaging_referrals', 'messaging_postbacks'])) {
+      if (!event || event.is_self || event.message?.is_echo || event.message?.is_deleted || event.recipient?.id !== accountId) continue
+      const senderId = metaText(event.sender?.id)
+      if (!senderId || senderId === accountId) continue
+      const referral = event.message?.referral ?? event.postback?.referral ?? event.referral
+      if (!referral) continue
+      const attribution = referralAttribution(referral)
+      if (!Object.keys(attribution).length) continue
+
+      const timestamp = new Date(event.timestamp ?? NaN).getTime()
+      const mid = metaText(event.message?.mid ?? event.postback?.mid, 512)
+      if (!Number.isFinite(timestamp) && !mid) continue
+      const eventKey = Number.isFinite(timestamp)
+        ? `time:${timestamp}:${attribution.ad_id ?? ''}`
+        : `message:${mid}`
+      referrals.set(`${senderId}:${eventKey}`, { senderId, eventKey, attribution })
+    }
+  }
+  return referrals
+}
+
+export async function socialLeadArgs(
+  referral: { senderId: string; eventKey: string; attribution: Record<string, string> },
+  channel: 'instagram' | 'messenger',
+  connection: { workspaceId: string; accountId: string; accountLabel: string },
+  adsToken?: string,
+) {
+  return {
+    p_account_id: connection.workspaceId,
+    p_channel: channel,
+    p_channel_account_id: connection.accountId,
+    p_channel_account_label: connection.accountLabel,
+    p_sender_id: referral.senderId,
+    p_event_key: referral.eventKey,
+    p_attribution: await enrichAd(referral.attribution, adsToken),
+  }
 }

@@ -624,6 +624,7 @@
       "notLinkedToAccount": "프로필이 계정에 연결되어 있지 않습니다."
     },
     "leads": {
+      "formAnswers": "인스턴트 양식 답변",
       "add": "리드 추가",
       "back": "리드 목록으로",
       "loading": "불러오는 중…",
@@ -689,7 +690,12 @@
         "utm_campaign": "UTM 캠페인",
         "utm_content": "UTM 콘텐츠",
         "utm_term": "UTM 검색어",
-        "referral_url": "참조 URL"
+        "referral_url": "참조 URL",
+        "referral_source": "참조 출처",
+        "referral_type": "참조 유형",
+        "referral_ref": "참조 코드",
+        "referral_headline": "참조 제목",
+        "meta_page_id": "Meta 페이지 ID"
       }
     },
     "detailView": {

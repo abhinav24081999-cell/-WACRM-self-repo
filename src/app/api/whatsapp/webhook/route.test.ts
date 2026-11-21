@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Shared, hoisted state the module mocks close over. Reset per test.
 const h = vi.hoisted(() => ({
@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
     // Result the message upsert's .select() resolves to. A genuine insert
     // returns the row; a replayed delivery conflicts and returns [].
     messageUpsertResult: [{ id: 'msg-1' }] as { id: string }[],
+    messageUpsertError: null as { message: string } | null,
     firstInboundUnclaimed: true,
     firstInboundClaims: 0,
     /** Row `lookupInternalIdByMetaId` resolves for a `context.id`. */
@@ -51,7 +52,7 @@ vi.mock('next/server', () => ({
     h.state.afterCallbacks.push(cb)
   },
   NextResponse: {
-    json: (body: unknown, init?: { status?: number }) => ({ body, init }),
+    json: (body: unknown, init?: { status?: number }) => ({ body, init, status: init?.status ?? 200 }),
   },
 }))
 
@@ -202,7 +203,7 @@ vi.mock('@supabase/supabase-js', () => ({
                 select: () =>
                   Promise.resolve({
                     data: h.state.messageUpsertResult,
-                    error: null,
+                    error: h.state.messageUpsertError,
                   }),
               }
             },
@@ -363,8 +364,10 @@ async function runStatusWebhook(status: Record<string, unknown>) {
 }
 
 beforeEach(() => {
+  vi.stubEnv('META_LEAD_WORKSPACE_ID', 'acc-1')
   vi.clearAllMocks()
   h.state.messageUpsertResult = [{ id: 'msg-1' }]
+  h.state.messageUpsertError = null
   h.state.firstInboundUnclaimed = true
   h.state.firstInboundClaims = 0
   h.state.replyContextParent = null
@@ -413,6 +416,8 @@ beforeEach(() => {
   })
 })
 
+afterEach(() => vi.unstubAllEnvs())
+
 describe('inbound webhook: idempotent insert (#367)', () => {
   it('a genuine first delivery persists once and fans out downstream', async () => {
     await runWebhook()
@@ -420,6 +425,7 @@ describe('inbound webhook: idempotent insert (#367)', () => {
     // Inserted via upsert with the (conversation_id, message_id) conflict
     // target — not a bare insert.
     expect(h.state.upsertCalls).toHaveLength(1)
+    expect(h.state.upsertCalls[0].row).not.toHaveProperty('meta_ad_referral')
     expect(h.state.upsertCalls[0].options).toMatchObject({
       onConflict: 'conversation_id,message_id',
       ignoreDuplicates: true,
@@ -428,6 +434,34 @@ describe('inbound webhook: idempotent insert (#367)', () => {
     expect(h.state.rpcCalls).toHaveLength(1)
     expect(h.dispatchInboundToFlows).toHaveBeenCalledTimes(1)
     expect(h.dispatchWebhookEvent).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores the click ID and ad ID before acknowledging the delivery, then runs automations', async () => {
+    const response = await POST(inboundRequest({ ...TEXT_MESSAGE, referral: {
+      source_type: 'ad', source_id: '90071992547409999', ctwa_clid: 'test-click',
+    } }))
+    expect(response.status).toBe(200)
+    expect(h.state.upsertCalls[0].row.meta_ad_referral).toEqual({
+      ad_id: '90071992547409999', ctwa_clid: 'test-click', referral_source: 'ad',
+    })
+    expect(h.dispatchInboundToFlows).not.toHaveBeenCalled()
+    for (const cb of h.state.afterCallbacks) await cb()
+    expect(h.dispatchInboundToFlows).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks Meta to retry when the ad message and lead cannot be persisted', async () => {
+    h.state.messageUpsertError = { message: 'Temporary database failure' }
+    const response = await runWebhook({ ...TEXT_MESSAGE, referral: { source_type: 'ad', source_id: '555' } })
+    expect(response.status).toBe(503)
+    expect(h.dispatchInboundToFlows).not.toHaveBeenCalled()
+  })
+
+  it('continues delivering ad-referred messages before Meta lead capture is enabled', async () => {
+    vi.stubEnv('META_LEAD_WORKSPACE_ID', '')
+    const response = await runWebhook({ ...TEXT_MESSAGE, referral: { source_type: 'ad', source_id: '555' } })
+    expect(response.status).toBe(200)
+    expect(h.state.upsertCalls[0].row).not.toHaveProperty('meta_ad_referral')
+    expect(h.dispatchInboundToFlows).toHaveBeenCalledTimes(1)
   })
 
   it('a replayed delivery is a no-op: no unread bump, no fan-out', async () => {
