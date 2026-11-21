@@ -20,7 +20,8 @@ const attributionFields = [
   'external_lead_id', 'form_id', 'campaign_id', 'campaign_name',
   'ad_group_id', 'ad_group_name', 'ad_id', 'ad_name', 'ctwa_clid',
   'gclid', 'gbraid', 'wbraid', 'utm_source', 'utm_medium', 'utm_campaign',
-  'utm_content', 'utm_term', 'referral_url',
+  'utm_content', 'utm_term', 'referral_url', 'referral_source', 'referral_type',
+  'referral_ref', 'referral_headline', 'meta_page_id',
 ] as const;
 
 type Status = (typeof statuses)[number];
@@ -33,6 +34,7 @@ interface Lead {
   source_detail: string | null;
   ads_platform: 'meta' | 'google' | null;
   attribution: Record<string, unknown>;
+  meta_event_key: string | null;
   updated_at: string;
 }
 
@@ -51,7 +53,7 @@ interface ContactScope {
 
 const listPageSize = 25;
 const selectClass = 'h-8 w-full rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-ring';
-const leadColumns = 'id,title,status,source,source_detail,ads_platform,attribution,updated_at';
+const leadColumns = 'id,title,status,source,source_detail,ads_platform,attribution,meta_event_key,updated_at';
 
 export function ContactLeads({ accountId, contactId }: ContactScope) {
   const t = useTranslations('Contacts.leads');
@@ -133,7 +135,9 @@ export function ContactLeads({ accountId, contactId }: ContactScope) {
               >
                 <span className="block break-words font-medium">{lead.title}</span>
                 <span className="text-xs text-muted-foreground">
-                  {t(`sources.${lead.source}`)} · {t(`statuses.${lead.status}`)}
+                  {lead.source === 'meta_instant_form' && lead.source_detail
+                    ? lead.source_detail
+                    : t(`sources.${lead.source}`)} · {t(`statuses.${lead.status}`)}
                 </span>
               </button>
             </li>
@@ -239,6 +243,7 @@ function LeadForm({ accountId, contactId, lead, canEdit, onSaved, onBack }: Cont
                     id={`${fieldId}-${field}`}
                     name={field}
                     defaultValue={typeof initial === 'string' ? initial : ''}
+                    readOnly={field === 'external_lead_id' && lead?.meta_event_key?.startsWith('meta_instant_form:')}
                     maxLength={field === 'referral_url' ? 2048 : 512}
                   />
                 </div>

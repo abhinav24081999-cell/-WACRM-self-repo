@@ -689,7 +689,12 @@
         "utm_campaign": "Campanha UTM",
         "utm_content": "Conteúdo UTM",
         "utm_term": "Termo UTM",
-        "referral_url": "URL de referência"
+        "referral_url": "URL de referência",
+        "referral_source": "Origem da referência",
+        "referral_type": "Tipo de referência",
+        "referral_ref": "Código da referência",
+        "referral_headline": "Título da referência",
+        "meta_page_id": "ID da página da Meta"
       }
     },
     "detailView": {

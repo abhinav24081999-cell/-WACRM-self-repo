@@ -420,6 +420,7 @@ describe('inbound webhook: idempotent insert (#367)', () => {
     // Inserted via upsert with the (conversation_id, message_id) conflict
     // target — not a bare insert.
     expect(h.state.upsertCalls).toHaveLength(1)
+    expect(h.state.upsertCalls[0].row).not.toHaveProperty('meta_ad_referral')
     expect(h.state.upsertCalls[0].options).toMatchObject({
       onConflict: 'conversation_id,message_id',
       ignoreDuplicates: true,
@@ -428,6 +429,15 @@ describe('inbound webhook: idempotent insert (#367)', () => {
     expect(h.state.rpcCalls).toHaveLength(1)
     expect(h.dispatchInboundToFlows).toHaveBeenCalledTimes(1)
     expect(h.dispatchWebhookEvent).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores the click ID and ad ID with a referred message', async () => {
+    await runWebhook({ ...TEXT_MESSAGE, referral: {
+      source_type: 'ad', source_id: '90071992547409999', ctwa_clid: 'test-click',
+    } })
+    expect(h.state.upsertCalls[0].row.meta_ad_referral).toEqual({
+      ad_id: '90071992547409999', ctwa_clid: 'test-click', referral_source: 'ad',
+    })
   })
 
   it('a replayed delivery is a no-op: no unread bump, no fan-out', async () => {

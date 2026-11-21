@@ -689,7 +689,12 @@
         "utm_campaign": "UTM campaign",
         "utm_content": "UTM content",
         "utm_term": "UTM term",
-        "referral_url": "Referral URL"
+        "referral_url": "Referral URL",
+        "referral_source": "Referral source",
+        "referral_type": "Referral type",
+        "referral_ref": "Referral code",
+        "referral_headline": "Referral headline",
+        "meta_page_id": "Meta Page ID"
       }
     },
     "detailView": {

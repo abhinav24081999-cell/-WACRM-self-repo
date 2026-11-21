@@ -32,6 +32,8 @@ import {
   isTemplateWebhookField,
 } from '@/lib/whatsapp/template-webhook'
 import { applyMessageStatus } from '@/lib/whatsapp/message-status-sync'
+import { adsTokenFor } from '@/lib/meta/lead-ads'
+import { enrichAd, referralAttribution } from '../../../../../supabase/functions/_shared/meta-ad-attribution'
 
 // The `after()` callback in POST runs within this route's max duration.
 // Inbound processing can fan out to per-media Meta verification calls, so
@@ -98,6 +100,7 @@ interface WhatsAppMessage {
   button?: { text?: string; payload?: string }
   /** Present when the customer swipe-replies to one of our messages. */
   context?: { id: string }
+  referral?: Record<string, unknown>
   /**
    * Why Meta could not hand this message over. Set on a `type:
    * 'unsupported'` delivery — a view-once photo, a poll, a disappearing
@@ -711,6 +714,8 @@ async function processMessage(
         : 'text'        // reaction, unknown → text fallback
 
   const receivedAt = new Date(parseInt(message.timestamp) * 1000).toISOString()
+  const referral = message.referral ? referralAttribution(message.referral, true) : {}
+  const attribution = Object.keys(referral).length ? await enrichAd(referral, adsTokenFor(accountId)) : null
 
   // Idempotent insert. Meta retries webhook deliveries (a slow ack, a
   // transient 5xx), and each retry replays the exact same message.id. The
@@ -750,6 +755,7 @@ async function processMessage(
         error_code: errorCode,
         error_title: errorTitle,
         error_details: errorDetails,
+        ...(attribution ? { meta_ad_referral: attribution } : {}),
       },
       { onConflict: 'conversation_id,message_id', ignoreDuplicates: true }
     )
