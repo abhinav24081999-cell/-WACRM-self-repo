@@ -67,7 +67,14 @@ export function configuredSources() {
 }
 
 export function metaEventPayload(event: ConversionEvent) {
-  const base = { event_name: event.destination, event_id: event.id, event_time: Math.floor(Date.parse(event.event_time) / 1000) }
+  const occurredAt = Date.parse(event.event_time)
+  const createdAt = Date.parse(event.identifiers.provider_created_at)
+  const eventSecond = Math.floor(occurredAt / 1000)
+  // Preserve ordering when a real CRM transition and the source lead share a Unix second.
+  const event_time = event.source === 'meta_instant_form' && occurredAt > createdAt
+    ? Math.max(eventSecond, Math.floor(createdAt / 1000) + 1)
+    : eventSecond
+  const base = { event_name: event.destination, event_id: event.id, event_time }
   if (event.source === 'meta_instant_form') return {
     ...base, action_source: 'system_generated', user_data: { lead_id: event.identifiers.lead_id },
     custom_data: { event_source: 'crm', lead_event_source: 'WACRM' },
@@ -163,13 +170,15 @@ export async function sendConversion(event: ConversionEvent, googleToken: () => 
   const occurredAt = Date.parse(event.event_time)
   const createdAt = Date.parse(event.identifiers.provider_created_at)
   if (!Number.isFinite(occurredAt) || occurredAt > Date.now()) throw new DeliveryError('meta_event_time_invalid')
-  if (Number.isFinite(createdAt) && Math.floor(occurredAt / 1000) < Math.floor(createdAt / 1000)) {
+  if (Number.isFinite(createdAt) && occurredAt <= createdAt) {
     throw new DeliveryError('meta_event_precedes_lead')
   }
   if (Date.now() - occurredAt > 7 * 24 * 60 * 60 * 1000) throw new DeliveryError('meta_event_expired')
   const testCode = process.env[`CONVERSION_META_${metaRoutes[event.source]}_TEST_CODE`]?.trim()
   if (event.test_mode && !testCode) throw new DeliveryError('meta_test_code_missing')
-  const payload = { data: [metaEventPayload(event)], ...(event.test_mode && { test_event_code: testCode }) }
+  const metaEvent = metaEventPayload(event)
+  if (metaEvent.event_time > Math.floor(Date.now() / 1000)) throw new DeliveryError('meta_event_timestamp_pending', true)
+  const payload = { data: [metaEvent], ...(event.test_mode && { test_event_code: testCode }) }
   const messaging = isMessagingConversion(event.source)
   let result
   try {

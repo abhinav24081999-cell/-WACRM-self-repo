@@ -100,3 +100,17 @@ it('requests a scoped OAuth token and keeps live sending disabled on Vercel prev
     iss: 'fixture@example.test', scope: 'https://www.googleapis.com/auth/datamanager', aud: endpoint,
   })
 })
+
+it('sends same-second CRM intake after original Meta lead creation without future timestamps', async () => {
+  const event = { ...base, event_time: '2026-11-21T09:30:00.500Z',
+    identifiers: { ...base.identifiers, provider_created_at: time } }
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ events_received: 1, fbtrace_id: 'trace' }))
+  vi.stubGlobal('fetch', fetcher)
+  vi.setSystemTime(new Date(event.event_time))
+  await expect(sendConversion({ ...event, event_time: time }, vi.fn())).rejects.toMatchObject({ reason: 'meta_event_precedes_lead' })
+  await expect(sendConversion(event, vi.fn())).rejects.toMatchObject({ reason: 'meta_event_timestamp_pending', retryable: true })
+  expect(fetcher).not.toHaveBeenCalled()
+  vi.setSystemTime(new Date('2026-11-21T09:30:01.000Z'))
+  await expect(sendConversion(event, vi.fn())).resolves.toBe('trace')
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).data[0].event_time).toBe(Date.parse(time) / 1000 + 1)
+})
