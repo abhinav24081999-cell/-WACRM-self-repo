@@ -73,12 +73,12 @@ export async function POST(request: Request) {
 
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('id, account_id, contact:contacts(phone, wa_user_id)')
+      .select('id, account_id, channel, contact:contacts(phone, wa_user_id)')
       .eq('id', targetMessage.conversation_id)
       .eq('account_id', accountId)
       .maybeSingle();
 
-    if (convError || !conversation) {
+    if (convError || !conversation || (conversation.channel && conversation.channel !== 'whatsapp')) {
       return NextResponse.json(
         { error: t('common.conversationNotFound') },
         { status: 404 },

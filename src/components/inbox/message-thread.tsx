@@ -7,6 +7,7 @@ import { usePresence } from "@/hooks/use-presence";
 import { PresenceDot } from "@/components/presence/presence-dot";
 import { presenceLabel } from "@/lib/presence";
 import { cn } from "@/lib/utils";
+import { channelLabel, isSocialChannel, socialSenderLabel } from "@/lib/social/channels";
 import type {
   Conversation,
   Message,
@@ -595,7 +596,10 @@ export function MessageThread({
       setReplyTo(null);
 
       try {
-        const res = await fetch("/api/whatsapp/send", {
+        const endpoint = isSocialChannel(conversation.channel)
+          ? "/api/social/send"
+          : "/api/whatsapp/send";
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -864,7 +868,10 @@ export function MessageThread({
   }, [reactions]);
 
   const contactDisplayName =
-    contact?.name || (contact ? contactHandle(contact) : "") || t("customer");
+    contact?.name ||
+    socialSenderLabel(conversation?.channel, conversation?.channel_sender_id) ||
+    (contact ? contactHandle(contact) : "") ||
+    t("customer");
 
   // Author label for a quoted message: "You" when we sent the parent,
   // contact name when the customer sent it.
@@ -990,7 +997,9 @@ export function MessageThread({
     );
   }
 
-  const displayName = contact.name || contactHandle(contact);
+  const social = isSocialChannel(conversation.channel);
+  const source = channelLabel(conversation.channel, conversation.channel_account_label);
+  const displayName = contactDisplayName;
   const messageGroups = groupMessagesByDate(messages);
   const currentStatus = STATUS_OPTIONS.find(
     (s) => s.value === conversation.status
@@ -1033,7 +1042,7 @@ export function MessageThread({
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold text-foreground">{displayName}</h2>
             <p className="truncate text-xs text-muted-foreground">
-              {contactHandle(contact)}
+              {social ? source : [source, contactHandle(contact)].filter(Boolean).join(" · ")}
             </p>
           </div>
           {/* Session timer badge — hidden on the narrowest phones so
@@ -1253,8 +1262,8 @@ export function MessageThread({
                       <MessageActions
                         key={msg.id}
                         message={msg}
-                        onReply={() => handleStartReply(msg)}
-                        onReact={(emoji) => {
+                        onReply={social ? undefined : () => handleStartReply(msg)}
+                        onReact={social ? undefined : (emoji) => {
                           if (emoji) void postReaction(msg.id, emoji);
                         }}
                       >
@@ -1283,7 +1292,7 @@ export function MessageThread({
       {/* AI auto-reply banner — take over an active bot, or resume it
           after a handoff. Renders nothing unless the account has
           auto-reply configured. */}
-      <AiThreadBanner
+      {!social && <AiThreadBanner
         conversationId={conversation.id}
         disabled={conversation.ai_autoreply_disabled ?? false}
         handoffSummary={conversation.ai_handoff_summary}
@@ -1294,17 +1303,19 @@ export function MessageThread({
             onAssignChange(conversation.id, patch.assigned_agent_id ?? null);
           }
         }}
-      />
+      />}
 
       {/* Composer */}
       <MessageComposer
+        key={conversation.id}
+        textOnly={social}
         conversationId={conversation.id}
         sessionExpired={sessionInfo.expired}
         onSend={handleSend}
         onSendMedia={handleSendMedia}
         onSendInteractive={handleSendInteractive}
         onOpenTemplates={handleOpenTemplates}
-        replyTo={replyTo}
+        replyTo={social ? null : replyTo}
         onClearReply={() => setReplyTo(null)}
       />
 

@@ -333,6 +333,8 @@
       "whatsappNotConnected": "O WhatsApp® não está conectado. Vá em Configurações para conectar sua conta."
     },
     "conversationList": {
+      "channelFilter": "Canal",
+      "allChannels": "Todos os canais",
       "searchPlaceholder": "Buscar conversas...",
       "filterAll": "Todas",
       "filterUnread": "Não lidas",
@@ -396,6 +398,7 @@
     },
     "composer": {
       "draftHint": "Toque em ✨ para redigir uma resposta com IA — você pode editá-la antes de enviar",
+      "socialSessionExpired": "O prazo de 24 horas terminou. Você poderá responder quando o cliente enviar outra mensagem.",
       "sessionExpiredHint": "A sessão de 24 horas expirou. Use um modelo para retomar o contato.",
       "templates": "Modelos",
       "readOnlyPlaceholder": "Somente leitura — visualizadores podem navegar, mas não responder",

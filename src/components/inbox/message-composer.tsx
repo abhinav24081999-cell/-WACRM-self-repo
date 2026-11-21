@@ -112,6 +112,7 @@ interface MediaDraft {
 interface MessageComposerProps {
   conversationId: string;
   sessionExpired: boolean;
+  textOnly?: boolean;
   onSend: (text: string, replyToId?: string) => void;
   onSendMedia: (payload: SendMediaPayload) => void;
   onSendInteractive: (payload: InteractiveMessagePayload, replyToId?: string) => void;
@@ -134,6 +135,7 @@ const OPUS_ENCODER_PATH = "/opus/encoderWorker.min.js";
 export function MessageComposer({
   conversationId,
   sessionExpired,
+  textOnly = false,
   onSend,
   onSendMedia,
   onSendInteractive,
@@ -566,9 +568,9 @@ export function MessageComposer({
       {sessionExpired && (
         <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2">
           <p className="text-xs text-amber-400">
-            {t("sessionExpiredHint")}
+            {t(textOnly ? "socialSessionExpired" : "sessionExpiredHint")}
           </p>
-          <Button
+          {!textOnly && <Button
             variant="ghost"
             size="sm"
             className="h-7 text-xs text-amber-400 hover:text-amber-300"
@@ -576,7 +578,7 @@ export function MessageComposer({
           >
             <LayoutTemplate className="mr-1 h-3 w-3" />
             {t("templates")}
-          </Button>
+          </Button>}
         </div>
       )}
 
@@ -650,7 +652,7 @@ export function MessageComposer({
           {/* Action buttons. On mobile this group wraps to its own row
               below the textarea (basis-full + order-2) so the input gets
               the full width; on sm+ it sits inline before the textarea. */}
-          <div className="order-2 flex basis-full items-end gap-2 sm:order-1 sm:basis-auto">
+          {!textOnly && <div className="order-2 flex basis-full items-end gap-2 sm:order-1 sm:basis-auto">
           {/* Attach menu — photo / video / document / voice. */}
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -746,7 +748,7 @@ export function MessageComposer({
               <Sparkles className="h-4 w-4" />
             )}
           </GatedButton>
-          </div>
+          </div>}
 
           <textarea
             ref={textareaRef}
@@ -761,6 +763,7 @@ export function MessageComposer({
                   : t("typeMessagePlaceholder")
             }
             disabled={sessionExpired || readOnly}
+            maxLength={textOnly ? 1000 : undefined}
             rows={1}
             // Textarea keeps its own inline title — the GatedButton
             // wrapping pattern doesn't apply to non-button inputs.
@@ -788,7 +791,7 @@ export function MessageComposer({
       {/* Hint sits outside the flex row so its height doesn't push
           `items-end` buttons below the textarea. Indented to line up
           under the textarea left edge. */}
-      {!draft && !recording && (
+      {!textOnly && !draft && !recording && (
         <p className="mt-1 pl-1 text-[10px] text-muted-foreground sm:pl-[5.5rem]">
           {t("draftHint")}
         </p>

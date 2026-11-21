@@ -232,7 +232,7 @@ export async function sendMessageToConversation(
     .eq('account_id', accountId)
     .single();
 
-  if (convError || !conversation) {
+  if (convError || !conversation || (conversation.channel && conversation.channel !== 'whatsapp')) {
     throw new SendMessageError('not_found', 'Conversation not found', 404);
   }
 

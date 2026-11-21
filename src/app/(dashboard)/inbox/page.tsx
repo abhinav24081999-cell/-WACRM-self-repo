@@ -523,6 +523,35 @@ function InboxPageInner() {
   }, [router]);
 
 
+  const instagramThreadId = activeConversation?.channel === "instagram"
+    ? activeConversation.id
+    : null;
+  const hasContact = !!activeContact;
+  const contactName = activeContact?.name;
+  useEffect(() => {
+    if (!instagramThreadId || !hasContact || contactName?.trim()) return;
+    const controller = new AbortController();
+
+    void fetch("/api/social/instagram/username", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: instagramThreadId }),
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (response.status !== 200) return;
+      const { name, contact_id: contactId } = await response.json();
+      if (controller.signal.aborted || typeof name !== "string" || !name) return;
+      const addName = (contact?: Contact | null) =>
+        contact && contact.id === contactId && !contact.name?.trim() ? { ...contact, name } : contact;
+      setActiveContact((contact) => addName(contact) ?? null);
+      setConversations((threads) => threads.map((thread) =>
+        thread.id === instagramThreadId ? { ...thread, contact: addName(thread.contact) ?? undefined } : thread
+      ));
+    }).catch(() => {});
+
+    return () => controller.abort();
+  }, [instagramThreadId, hasContact, contactName]);
+
   const handleMessagesLoaded = useCallback(
     (loaded: Message[], conversationId: string) => {
       setMessages((prev) => mergeFetchedPage(prev, loaded, conversationId));
