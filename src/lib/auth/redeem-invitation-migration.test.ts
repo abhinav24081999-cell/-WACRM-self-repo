@@ -16,15 +16,19 @@ const tablesWithoutDomainData = new Set([
   "pending_message_statuses",
 ]);
 
-function accountScopedTables(): Set<string> {
-  const tables = new Set<string>();
+function accountScopedTables(): Map<string, boolean> {
+  const tables = new Map<string, boolean>();
   const accountForeignKey = /\baccount_id\s+uuid\b[^,;]*references\s+(?:public\.)?accounts\s*\(\s*id\s*\)/i;
   const tableName = /(?:create\s+table(?:\s+if\s+not\s+exists)?|alter\s+table)\s+(?:public\.)?(\w+)/i;
   for (const { sql } of migrations) {
     for (const statement of sql.split(";")) {
-      if (!accountForeignKey.test(statement)) continue;
+      const foreignKey = statement.match(accountForeignKey);
+      if (!foreignKey) continue;
       const match = statement.match(tableName);
-      if (match) tables.add(match[1].toLowerCase());
+      if (match) {
+        const deletionRule = statement.slice((foreignKey.index ?? 0) + foreignKey[0].length);
+        tables.set(match[1].toLowerCase(), /^\s+on\s+delete\s+restrict\b/i.test(deletionRule));
+      }
     }
   }
   return tables;
@@ -45,14 +49,15 @@ describe("redeem_invitation migration", () => {
 
   it("finds the account-scoped tables it is meant to guard", () => {
     const tables = accountScopedTables();
-    expect(tables).toContain("contacts");
-    expect(tables).toContain("api_keys");
-    expect(tables).toContain("quick_replies");
+    expect([...tables.keys()]).toContain("contacts");
+    expect([...tables.keys()]).toContain("api_keys");
+    expect([...tables.keys()]).toContain("quick_replies");
   });
 
-  it("checks every account-scoped table for data before deleting the old account", () => {
+  it("guards account-scoped data during invitation redemption", () => {
     const missing = [...accountScopedTables()]
-      .filter((table) => !tablesWithoutDomainData.has(table))
+      .filter(([table, restrictsDeletion]) => !tablesWithoutDomainData.has(table) && !restrictsDeletion)
+      .map(([table]) => table)
       .filter((table) => !new RegExp(`from\\s+${table}\\s+where\\s+account_id\\s*=\\s*v_old_account_id`, "i").test(body));
     expect(missing).toEqual([]);
   });
