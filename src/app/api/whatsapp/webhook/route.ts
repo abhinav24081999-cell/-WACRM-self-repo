@@ -32,7 +32,7 @@ import {
   isTemplateWebhookField,
 } from '@/lib/whatsapp/template-webhook'
 import { applyMessageStatus } from '@/lib/whatsapp/message-status-sync'
-import { adsTokenFor } from '@/lib/meta/lead-ads'
+import { adsTokenFor, metaLeadWorkspace } from '@/lib/meta/lead-ads'
 import { enrichAd, referralAttribution } from '../../../../../supabase/functions/_shared/meta-ad-attribution'
 
 // The `after()` callback in POST runs within this route's max duration.
@@ -274,7 +274,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const hasAdLeads = Array.isArray(body?.entry) && body.entry.some(entry => (
+  const hasAdLeads = metaLeadWorkspace() && Array.isArray(body?.entry) && body.entry.some(entry => (
     Array.isArray(entry?.changes) && entry.changes.some(change => (
       Array.isArray(change?.value?.messages) && change.value.messages.some(message => Object.keys(adReferral(message)).length > 0)
     ))
@@ -756,7 +756,7 @@ async function processMessage(
         : 'text'        // reaction, unknown → text fallback
 
   const receivedAt = new Date(parseInt(message.timestamp) * 1000).toISOString()
-  const referral = adReferral(message)
+  const referral = metaLeadWorkspace() === accountId ? adReferral(message) : {}
   const attribution = Object.keys(referral).length ? await enrichAd(referral, adsTokenFor(accountId)) : null
 
   // Idempotent insert. Meta retries webhook deliveries (a slow ack, a

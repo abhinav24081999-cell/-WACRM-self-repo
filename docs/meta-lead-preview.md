@@ -3,8 +3,10 @@
 Use a test Supabase project and Meta test assets. Apply the social inbox,
 lead management and Meta lead migrations in order before testing webhooks.
 
-Apply the database migrations before enabling these webhook routes. For a
-fresh WACRM database, apply the earlier application migrations first.
+Apply the database migrations before setting `META_LEAD_WORKSPACE_ID`, which
+enables lead capture for that workspace. For a fresh WACRM database, apply
+the earlier application migrations first. Inbox messages still arrive
+before lead capture is enabled.
 
 For Facebook and Instagram Instant Forms, configure these preview-only server variables.
 
@@ -28,8 +30,9 @@ The WhatsApp `messages` webhook already receives ad referral information. For
 Instagram and Messenger, keep `messages` and subscribe to `messaging_referrals`
 and `messaging_postbacks` where Meta exposes them. If Instagram uses the
 [Edge Function receiver](social-inbox-preview.md#instagram-inbound-delivery-on-a-protected-preview),
-include both shared modules in the test deployment. Set the optional ad-account
-token and its workspace UUID as Edge Function secrets if you want enrichment there.
+include both shared modules in the test deployment. Set `META_LEAD_WORKSPACE_ID`
+as an Edge Function secret to enable capture. Set the optional ad-account token
+there as well if you want enrichment.
 
 Submit an Instant Form from a test Page and use test ad referrals for each
 channel. In **Contacts → contact → Leads**, check the source, status, external

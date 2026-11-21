@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Shared, hoisted state the module mocks close over. Reset per test.
 const h = vi.hoisted(() => ({
@@ -364,6 +364,7 @@ async function runStatusWebhook(status: Record<string, unknown>) {
 }
 
 beforeEach(() => {
+  vi.stubEnv('META_LEAD_WORKSPACE_ID', 'acc-1')
   vi.clearAllMocks()
   h.state.messageUpsertResult = [{ id: 'msg-1' }]
   h.state.messageUpsertError = null
@@ -415,6 +416,8 @@ beforeEach(() => {
   })
 })
 
+afterEach(() => vi.unstubAllEnvs())
+
 describe('inbound webhook: idempotent insert (#367)', () => {
   it('a genuine first delivery persists once and fans out downstream', async () => {
     await runWebhook()
@@ -451,6 +454,14 @@ describe('inbound webhook: idempotent insert (#367)', () => {
     const response = await runWebhook({ ...TEXT_MESSAGE, referral: { source_type: 'ad', source_id: '555' } })
     expect(response.status).toBe(503)
     expect(h.dispatchInboundToFlows).not.toHaveBeenCalled()
+  })
+
+  it('continues delivering ad-referred messages before Meta lead capture is enabled', async () => {
+    vi.stubEnv('META_LEAD_WORKSPACE_ID', '')
+    const response = await runWebhook({ ...TEXT_MESSAGE, referral: { source_type: 'ad', source_id: '555' } })
+    expect(response.status).toBe(200)
+    expect(h.state.upsertCalls[0].row).not.toHaveProperty('meta_ad_referral')
+    expect(h.dispatchInboundToFlows).toHaveBeenCalledTimes(1)
   })
 
   it('a replayed delivery is a no-op: no unread bump, no fan-out', async () => {

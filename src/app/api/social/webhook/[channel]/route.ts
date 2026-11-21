@@ -2,7 +2,7 @@ import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { isSocialChannel } from '@/lib/social/channels'
 import { connectionFor, fetchContactName, readAdReferrals, readMessages, socialLeadArgs, validSignature } from '@/lib/social/meta'
 import { verifyTokenMatches } from '@/lib/whatsapp/webhook-signature'
-import { adsTokenFor, captureFormLeads, formConnection, readFormEvents } from '@/lib/meta/lead-ads'
+import { adsTokenFor, captureFormLeads, formConnection, metaLeadWorkspace, readFormEvents } from '@/lib/meta/lead-ads'
 import { readCappedBody } from '@/lib/whatsapp/webhook-body'
 
 export const maxDuration = 60
@@ -66,10 +66,12 @@ export async function POST(request: Request, { params }: Context) {
       })
       if (error) throw error
     }
-    for (const referral of readAdReferrals(payload, channel, connection.accountId).values()) {
-      const args = await socialLeadArgs(referral, channel, connection, adsTokenFor(connection.workspaceId))
-      const { error } = await db.rpc('record_meta_social_lead', args)
-      if (error) throw error
+    if (connection.workspaceId === metaLeadWorkspace()) {
+      for (const referral of readAdReferrals(payload, channel, connection.accountId).values()) {
+        const args = await socialLeadArgs(referral, channel, connection, adsTokenFor(connection.workspaceId))
+        const { error } = await db.rpc('record_meta_social_lead', args)
+        if (error) throw error
+      }
     }
     const forms = channel === 'messenger' ? formConnection() : null
     if (forms && forms.pageId === connection.accountId && forms.workspaceId === connection.workspaceId &&

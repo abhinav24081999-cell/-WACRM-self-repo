@@ -74,11 +74,11 @@ Deno.serve(async (request) => {
         p_agent_id: null,
       })
     }
-    const adsToken = config.workspaceId === Deno.env.get('META_LEAD_WORKSPACE_ID')?.trim()
-      ? Deno.env.get('META_LEAD_ADS_ACCESS_TOKEN')?.trim()
-      : undefined
-    for (const referral of readAdReferrals(payload, 'instagram', config.accountId).values()) {
-      await record('record_meta_social_lead', await socialLeadArgs(referral, 'instagram', config, adsToken))
+    if (config.workspaceId === Deno.env.get('META_LEAD_WORKSPACE_ID')?.trim()) {
+      const adsToken = Deno.env.get('META_LEAD_ADS_ACCESS_TOKEN')?.trim()
+      for (const referral of readAdReferrals(payload, 'instagram', config.accountId).values()) {
+        await record('record_meta_social_lead', await socialLeadArgs(referral, 'instagram', config, adsToken))
+      }
     }
   } catch (error) {
     console.error('[instagram-inbox] Could not persist Meta delivery', error instanceof Error ? error.name : 'Unknown')

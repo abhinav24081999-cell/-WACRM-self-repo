@@ -2,14 +2,18 @@ import { enrichAd, fields, metaId, metaText, readGraphObject } from '../../../su
 import { parseInternationalPhone } from '@/lib/whatsapp/phone-utils'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 
+export function metaLeadWorkspace() {
+  return process.env.META_LEAD_WORKSPACE_ID?.trim()
+}
+
 export function adsTokenFor(workspaceId: string) {
-  return workspaceId === process.env.META_LEAD_WORKSPACE_ID?.trim()
+  return workspaceId === metaLeadWorkspace()
     ? process.env.META_LEAD_ADS_ACCESS_TOKEN?.trim() || undefined
     : undefined
 }
 
 export function formConnection() {
-  const workspaceId = process.env.META_LEAD_WORKSPACE_ID?.trim()
+  const workspaceId = metaLeadWorkspace()
   const pageId = metaId(process.env.META_LEAD_PAGE_ID?.trim())
   const accessToken = process.env.META_LEAD_PAGE_ACCESS_TOKEN?.trim()
   const appSecret = process.env.META_LEAD_APP_SECRET?.trim()
