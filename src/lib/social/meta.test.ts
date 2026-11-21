@@ -59,9 +59,9 @@ describe('Meta social channels', () => {
   })
 
   it.each([
-    ['instagram', 'instagram', {}],
-    ['messenger', 'facebook', { messaging_type: 'RESPONSE' }],
-  ] as const)('sends %s replies to the matching provider and recipient', async (channel, host, extra) => {
+    ['instagram', {}],
+    ['messenger', { messaging_type: 'RESPONSE' }],
+  ] as const)('sends %s replies to the matching provider and recipient', async (channel, extra) => {
     const mock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ message_id: 'sent-id' }))
     vi.stubGlobal('fetch', mock)
     try {
@@ -69,7 +69,7 @@ describe('Meta social channels', () => {
         channel, workspaceId: 'test-workspace', accountId, accountLabel: 'Test',
         accessToken: 'test-token', appSecret: 'test-secret', verifyToken: 'test-verify',
       }, senderId, 'Hi')).resolves.toBe('sent-id')
-      expect(mock.mock.calls[0][0]).toBe(`https://graph.${host}.com/v27.0/${accountId}/messages`)
+      expect(mock.mock.calls[0][0]).toBe(`https://graph.facebook.com/v27.0/${accountId}/messages`)
       expect(JSON.parse(mock.mock.calls[0][1]?.body as string)).toEqual({
         ...extra, recipient: { id: senderId }, message: { text: 'Hi' },
       })

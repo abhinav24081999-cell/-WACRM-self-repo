@@ -11,14 +11,15 @@ Set these server-only environment variables for the preview branch:
 | Suffix | `SOCIAL_INSTAGRAM_` | `SOCIAL_MESSENGER_` |
 | --- | --- | --- |
 | `WORKSPACE_ID` | Test workspace UUID | Test workspace UUID |
-| `ACCOUNT_ID` | Instagram professional account ID from Instagram Login | Facebook Page ID |
+| `ACCOUNT_ID` | Instagram professional account ID from Unified Login | Facebook Page ID |
 | `ACCOUNT_LABEL` | Instagram handle | Facebook Page name |
-| `ACCESS_TOKEN` | Instagram User access token | Page access token |
-| `APP_SECRET` | Secret that signs Instagram Login webhooks | Meta App Secret |
+| `ACCESS_TOKEN` | Instagram Unified Login system-user access token | Page access token |
+| `APP_SECRET` | Meta App Secret that signs Instagram webhooks | Meta App Secret |
 | `VERIFY_TOKEN` | A random string for the Instagram callback challenge | A random string for the Messenger callback challenge |
 
-Use Instagram Login with `instagram_business_basic` and
-`instagram_business_manage_messages`. For Messenger, authorize the Page and
+Use an Instagram Unified Login configuration with `instagram_basic` and
+`instagram_manage_messages`. The preview uses a configured system-user token
+for the selected Instagram account. For Messenger, authorize the Page and
 subscribe the app to the Page with `pages_messaging`. With a development app,
 use a sender allowed by the relevant Meta app roles and settings.
 

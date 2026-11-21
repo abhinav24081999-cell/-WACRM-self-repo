@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { SocialChannel } from './channels'
 
-const graphVersion = 'v27.0'
+const graphBase = 'https://graph.facebook.com/v27.0'
 const replyWindowMs = 24 * 60 * 60 * 1000
 
 export function connectionFor(channel: SocialChannel) {
@@ -78,10 +78,6 @@ export function readMessages(payload: MetaDelivery | null, channel: SocialChanne
   return messages
 }
 
-function graphBase(channel: SocialChannel) {
-  return `https://graph.${channel === 'instagram' ? 'instagram' : 'facebook'}.com/${graphVersion}`
-}
-
 export async function fetchContactName(
   channel: SocialChannel,
   accessToken: string,
@@ -89,7 +85,7 @@ export async function fetchContactName(
 ): Promise<string | null> {
   const fields = channel === 'instagram' ? 'name,username' : 'first_name,last_name'
   try {
-    const response = await fetch(`${graphBase(channel)}/${encodeURIComponent(senderId)}?fields=${fields}`, {
+    const response = await fetch(`${graphBase}/${encodeURIComponent(senderId)}?fields=${fields}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(2000),
     })
@@ -109,7 +105,7 @@ export async function sendSocialText(
   senderId: string,
   text: string,
 ) {
-  const response = await fetch(`${graphBase(connection.channel)}/${encodeURIComponent(connection.accountId)}/messages`, {
+  const response = await fetch(`${graphBase}/${encodeURIComponent(connection.accountId)}/messages`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${connection.accessToken}`,
