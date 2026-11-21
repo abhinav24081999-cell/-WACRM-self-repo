@@ -25,7 +25,7 @@ Spend is fetched server-side from the connected ad account and matched to the pl
 ## Connect and verify Bankshakha's assets
 
 1. Connect the Meta Page and grant the app Leads Access. Open the Meta form and send a test lead, then confirm the original Lead ID and attribution in WACRM.
-2. Configure the Google Ads lead-form webhook using [Google lead intake](./google-lead-preview.md). Send a test lead and check a single WACRM record. For a Google-attributed website form, verify the click ID survives landing page and form submission.
+2. Configure the Google Ads lead-form webhook using [Google lead intake](./google-lead-preview.md). Use Google Ads’ test to verify acknowledgement. Then submit an authorized sample through the active form and verify one WACRM record. The Google webhook test flag deliberately skips persistence. For a Google-attributed website form, verify the click ID survives landing page and form submission.
 3. Configure provider datasets and test codes using [Conversion Feedback](./conversion-feedback.md). Create test-mode rules. For Meta CRM, map both the raw event and the later milestone before testing.
 4. In Meta Events Manager, verify the event, action source, event name and dataset for each connected source. For Google Data Manager, check the API request and subsequent diagnostics. Review live match and coverage after production activation.
 5. Vercel invokes the authenticated worker once daily at 02:00 UTC (07:30 IST). An operator can process due events from **Settings → Conversion Feedback**. Production sends also require the verified workspace, provider credentials, a live rule and the server-side live opt-in. Verify a real receipt and its diagnostics before treating an event as usable for optimization.
