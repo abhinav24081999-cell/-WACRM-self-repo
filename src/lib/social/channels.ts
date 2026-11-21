@@ -16,5 +16,5 @@ export function channelLabel(channel: InboxChannel = 'whatsapp', accountLabel?: 
 }
 
 export function socialSenderLabel(channel: InboxChannel | undefined, senderId?: string | null) {
-  return isSocialChannel(channel) && senderId ? `ID ${senderId}` : undefined
+  return channel === 'messenger' && senderId ? `ID ${senderId}` : undefined
 }

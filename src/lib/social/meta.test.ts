@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { canReplyAt, readMessages, sendSocialText, validSignature } from './meta'
+import { canReplyAt, fetchContactName, readMessages, sendSocialText, validSignature } from './meta'
 
 const accountId = '100'
 const senderId = '200'
@@ -56,6 +56,46 @@ describe('Meta social channels', () => {
     expect(canReplyAt(sentAt, timestamp + 86_400_000)).toBe(false)
     expect(canReplyAt(null, timestamp)).toBe(false)
     expect(canReplyAt(sentAt, timestamp - 1)).toBe(false)
+  })
+
+  it('uses the Instagram username even when a full name is returned', async () => {
+    const mock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ name: 'Person', username: 'example.user' }))
+    vi.stubGlobal('fetch', mock)
+    try {
+      await expect(fetchContactName('instagram', 'test-token', senderId, 'message-id')).resolves.toBe('@example.user')
+      expect(mock.mock.calls[0][0]).toBe(`https://graph.facebook.com/v27.0/${senderId}?fields=username`)
+      expect(mock).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each([senderId, 'another-sender'])('validates the author of the fallback message (%s)', async (authorId) => {
+    const mock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({}, { status: 400 }))
+      .mockResolvedValueOnce(Response.json({ from: { id: authorId, username: 'example.user' } }))
+      .mockResolvedValueOnce(Response.json({}, { status: 400 }))
+    vi.stubGlobal('fetch', mock)
+    try {
+      await expect(fetchContactName('instagram', 'test-token', senderId, 'message/id'))
+        .resolves.toBe(authorId === senderId ? '@example.user' : null)
+      expect(mock.mock.calls[1][0]).toBe('https://graph.facebook.com/v27.0/message%2Fid?fields=from')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('uses the Instagram Graph profile when the Facebook Graph cannot read the dashboard token', async () => {
+    const mock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({}, { status: 400 }))
+      .mockResolvedValueOnce(Response.json({ username: 'example.user' }))
+    vi.stubGlobal('fetch', mock)
+    try {
+      await expect(fetchContactName('instagram', 'test-token', senderId)).resolves.toBe('@example.user')
+      expect(mock.mock.calls[1][0]).toBe(`https://graph.instagram.com/v27.0/${senderId}?fields=username`)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it.each([

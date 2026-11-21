@@ -42,7 +42,7 @@ export async function POST(request: Request, { params }: Context) {
           .maybeSingle()
         if (error) throw error
         if (!data) {
-          contactName = await fetchContactName(channel, connection.accessToken, message.senderId)
+          contactName = await fetchContactName(channel, connection.accessToken, message.senderId, message.messageId)
         }
       }
 

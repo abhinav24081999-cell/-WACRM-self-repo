@@ -78,26 +78,52 @@ export function readMessages(payload: MetaDelivery | null, channel: SocialChanne
   return messages
 }
 
+function instagramHandle(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z0-9._]{1,30}$/.test(value) ? `@${value}` : null
+}
+
+async function readGraphProfile(url: string, accessToken: string) {
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(2000),
+    })
+    return response.ok ? await response.json() : null
+  } catch {
+    return null
+  }
+}
+
 export async function fetchContactName(
   channel: SocialChannel,
   accessToken: string,
   senderId: string,
+  messageId?: string,
 ): Promise<string | null> {
-  const fields = channel === 'instagram' ? 'name,username' : 'first_name,last_name'
-  try {
-    const response = await fetch(`${graphBase}/${encodeURIComponent(senderId)}?fields=${fields}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(2000),
-    })
-    if (!response.ok) return null
-    const profile = await response.json()
-    const name = channel === 'instagram'
-      ? profile.name || profile.username
-      : [profile.first_name, profile.last_name].filter(Boolean).join(' ')
-    return typeof name === 'string' ? name.trim().slice(0, 255) || null : null
-  } catch {
-    return null
+  const id = encodeURIComponent(senderId)
+  if (channel === 'messenger') {
+    const profile = await readGraphProfile(`${graphBase}/${id}?fields=first_name,last_name`, accessToken)
+    return [profile?.first_name, profile?.last_name]
+      .filter((name): name is string => typeof name === 'string')
+      .join(' ').trim().slice(0, 255) || null
   }
+
+  const profile = await readGraphProfile(`${graphBase}/${id}?fields=username`, accessToken)
+  const username = instagramHandle(profile?.username)
+  if (username) return username
+
+  if (messageId) {
+    const mid = encodeURIComponent(messageId)
+    const message = await readGraphProfile(`${graphBase}/${mid}?fields=from`, accessToken)
+    const fromHandle = message?.from?.id === senderId ? instagramHandle(message.from.username) : null
+    if (fromHandle) return fromHandle
+  }
+
+  // The Meta dashboard can also issue an Instagram user token for this account.
+  const instagramProfile = await readGraphProfile(`https://graph.instagram.com/v27.0/${id}?fields=username`, accessToken)
+  return instagramHandle(instagramProfile?.username)
 }
 
 export async function sendSocialText(
