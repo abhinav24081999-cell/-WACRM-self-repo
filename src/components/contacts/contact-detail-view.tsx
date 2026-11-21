@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { addContactTag, deleteContactTag } from '@/lib/contacts/tag-api';
+import { ContactLeads } from '@/components/contacts/contact-leads';
 import { useAuth } from '@/hooks/use-auth';
 import { formatCurrency } from '@/lib/currency';
 import { toast } from 'sonner';
@@ -465,12 +466,18 @@ export function ContactDetailView({
 
             {/* Tabs */}
             <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
-              <TabsList className="bg-muted/50 border-b border-border mx-4 mt-3">
+              <TabsList className="bg-muted/50 border-b border-border mx-4 mt-3 max-w-[calc(100%-2rem)] justify-start overflow-x-auto">
                 <TabsTrigger
                   value="details"
                   className="data-active:bg-muted data-active:text-primary text-muted-foreground"
                 >
                   {t('tabs.details')}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="leads"
+                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
+                >
+                  {t('tabs.leads')}
                 </TabsTrigger>
                 <TabsTrigger
                   value="tags"
@@ -497,6 +504,12 @@ export function ContactDetailView({
                   {t('tabs.deals')}
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="leads" className="flex-1 overflow-y-auto px-4 py-3">
+                {accountId && contactId === contact.id && (
+                  <ContactLeads key={`${accountId}:${contact.id}`} accountId={accountId} contactId={contact.id} />
+                )}
+              </TabsContent>
 
               {/* Details Tab */}
               <TabsContent value="details" className="flex-1 overflow-y-auto px-4 py-3">
