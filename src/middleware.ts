@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  if (['/api/meta/leads/webhook', '/api/google/leads/webhook', '/api/leads/website'].includes(request.nextUrl.pathname)) {
+  if (['/api/meta/leads/webhook', '/api/google/leads/webhook', '/api/leads/website', '/api/conversion-feedback/cron'].includes(request.nextUrl.pathname)) {
     return NextResponse.next()
   }
 

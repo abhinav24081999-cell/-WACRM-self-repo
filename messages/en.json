@@ -1687,6 +1687,48 @@
       "descriptionLabel": "Flow description"
     }
   },
+  "ConversionFeedback": {
+    "title": "Conversion feedback",
+    "liveEnabled": "Live delivery is enabled.",
+    "testOnly": "Test mode only.",
+    "configured": "Credentials configured for {sources}.",
+    "connectionNeeded": "Add workspace and provider credentials to process events.",
+    "loadError": "Could not load conversion rules or history.",
+    "adminOnly": "Only workspace admins can manage conversion feedback.",
+    "source": "Lead source",
+    "stage": "CRM milestone",
+    "googleAction": "Google conversion action ID",
+    "metaEvent": "Meta event name",
+    "delivery": "Delivery mode",
+    "manual": "Manual",
+    "automatic": "Automatic",
+    "off": "Off",
+    "testMode": "Test mode",
+    "liveMode": "Live mode",
+    "save": "Save rule",
+    "saved": "Rule saved.",
+    "saveError": "Could not save the rule.",
+    "history": "Delivery history",
+    "refresh": "Refresh",
+    "process": "Process queue",
+    "empty": "No conversion attempts yet.",
+    "processed": "{count} events processed.",
+    "runError": "Could not process the queue.",
+    "attempts": "{count} attempts",
+    "queue": "Queue conversion",
+    "queued": "Conversion is available in delivery history.",
+    "missingMilestone": "Configure a rule for a milestone this lead has reached.",
+    "queueError": "Could not queue this conversion.",
+    "states": {
+      "pending": "Pending",
+      "sending": "Sending",
+      "retrying": "Retrying",
+      "accepted": "Accepted by API",
+      "tested": "Tested",
+      "failed": "Failed",
+      "skipped": "Skipped"
+    }
+  },
   "Settings": {
     "pageTitle": "Settings",
     "pageDesc": "Everything in one place — your account and your workspace. Pick a section to manage it.",
@@ -2055,7 +2097,8 @@
       "deals": "Deals & currency",
       "inbox": "Inbox",
       "members": "Team members",
-      "api": "API keys"
+      "api": "API keys",
+      "conversion-feedback": "Conversion feedback"
     },
     "groups": {
       "account": "Account",

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCan } from '@/hooks/use-can';
 import { createClient } from '@/lib/supabase/client';
+import Link from 'next/link';
 
 const statuses = [
   'new', 'interested', 'not_interested', 'busy', 'no_response',
@@ -119,6 +120,7 @@ export function ContactLeads({ accountId, contactId }: ContactScope) {
             </dl>
           </details>
         )}
+        {lead && <QueueLeadFeedback lead={lead} />}
         {lead && <LeadHistory key={`history:${lead.updated_at}`} leadId={lead.id} />}
       </div>
     );
@@ -161,6 +163,47 @@ export function ContactLeads({ accountId, contactId }: ContactScope) {
       {leads && <PageButtons page={page} hasNext={leads.length > listPageSize} onPage={loadPage} />}
     </div>
   );
+}
+
+function QueueLeadFeedback({ lead }: { lead: Lead }) {
+  const t = useTranslations('ConversionFeedback');
+  const statusesT = useTranslations('Contacts.leads.statuses');
+  const canQueue = useCan('edit-settings');
+  const selectId = useId();
+  const google = (lead.source === 'google_lead_form' || lead.source === 'website_form') && lead.ads_platform === 'google';
+  const messaging = ['whatsapp', 'instagram_dm', 'messenger'].includes(lead.source);
+  const stages = google ? ['qualified', 'converted'] : messaging ? ['new', 'qualified'] : ['new', 'qualified', 'converted'];
+  const [stage, setStage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!canQueue || (!google && !messaging && lead.source !== 'meta_instant_form')) return null;
+
+  const selectedStage = stage && stages.includes(stage) ? stage : stages.includes(lead.status) ? lead.status : stages[0];
+  async function queue() {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/conversion-feedback', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'queue', leadId: lead.id, stage: selectedStage }),
+      });
+      if (response.ok) toast.success(t('queued'));
+      else toast.error(t(response.status === 422 ? 'missingMilestone' : 'queueError'));
+    } catch { toast.error(t('queueError')); }
+    finally { setBusy(false); }
+  }
+
+  return <div className="space-y-2 rounded-lg border p-3">
+    <h3 className="font-medium">{t('title')}</h3>
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="space-y-1">
+        <Label htmlFor={selectId}>{t('stage')}</Label>
+        <select id={selectId} value={selectedStage} onChange={event => setStage(event.target.value)} className={selectClass}>
+          {stages.map(value => <option value={value} key={value}>{statusesT(value)}</option>)}
+        </select>
+      </div>
+      <Button type="button" size="sm" onClick={() => void queue()} disabled={busy}>{t('queue')}</Button>
+      <Link className="self-center text-sm underline" href="/settings?tab=conversion-feedback">{t('history')}</Link>
+    </div>
+  </div>;
 }
 
 function LeadForm({ accountId, contactId, lead, canEdit, onSaved, onBack }: ContactScope & {

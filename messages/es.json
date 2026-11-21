@@ -1687,6 +1687,48 @@
       "descriptionLabel": "Descripción del flujo"
     }
   },
+  "ConversionFeedback": {
+    "title": "Comentarios de conversión",
+    "liveEnabled": "El envío en vivo está habilitado.",
+    "testOnly": "Solo modo de prueba.",
+    "configured": "Credenciales configuradas para {sources}.",
+    "connectionNeeded": "Añade credenciales del espacio y del proveedor para procesar eventos.",
+    "loadError": "No se pudieron cargar las reglas o el historial.",
+    "adminOnly": "Solo los administradores pueden gestionar las conversiones.",
+    "source": "Origen del lead",
+    "stage": "Etapa del CRM",
+    "googleAction": "ID de acción de conversión de Google",
+    "metaEvent": "Nombre del evento de Meta",
+    "delivery": "Modo de envío",
+    "manual": "Manual",
+    "automatic": "Automático",
+    "off": "Desactivado",
+    "testMode": "Modo de prueba",
+    "liveMode": "Modo en vivo",
+    "save": "Guardar regla",
+    "saved": "Regla guardada.",
+    "saveError": "No se pudo guardar la regla.",
+    "history": "Historial de envíos",
+    "refresh": "Actualizar",
+    "process": "Procesar cola",
+    "empty": "Aún no hay intentos de conversión.",
+    "processed": "{count} eventos procesados.",
+    "runError": "No se pudo procesar la cola.",
+    "attempts": "{count} intentos",
+    "queue": "Poner conversión en cola",
+    "queued": "La conversión está disponible en el historial.",
+    "missingMilestone": "Configura una regla para una etapa alcanzada por este lead.",
+    "queueError": "No se pudo poner la conversión en cola.",
+    "states": {
+      "pending": "Pendiente",
+      "sending": "Enviando",
+      "retrying": "Reintentando",
+      "accepted": "Aceptado por la API",
+      "tested": "Probado",
+      "failed": "Fallido",
+      "skipped": "Omitido"
+    }
+  },
   "Settings": {
     "pageTitle": "Configuración",
     "pageDesc": "Todo en un solo lugar: tu cuenta y tu espacio de trabajo. Elige una sección para administrarla.",
@@ -2055,7 +2097,8 @@
       "deals": "Negocios y moneda",
       "inbox": "Bandeja de entrada",
       "members": "Miembros del equipo",
-      "api": "Claves de API"
+      "api": "Claves de API",
+      "conversion-feedback": "Comentarios de conversión"
     },
     "groups": {
       "account": "Cuenta",
