@@ -637,6 +637,7 @@
       "adsPlatform": "Ad platform",
       "unspecified": "Unspecified",
       "attribution": "Ad attribution",
+      "formAnswers": "Instant Form answers",
       "titleRequired": "Enter a lead title.",
       "saveFailed": "Could not save the lead.",
       "stale": "The lead changed since you opened it. Go back and reopen it to see the latest version.",

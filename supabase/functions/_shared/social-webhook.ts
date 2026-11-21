@@ -26,16 +26,23 @@ interface SocialEvent {
   }
 }
 
+function eventsFor(entry: NonNullable<MetaDelivery['entry']>[number], fields: string[]) {
+  const fieldsWithEvents = Array.isArray(entry.changes) ? entry.changes.filter(change =>
+    fields.includes(change?.field ?? ''),
+  ).map(change => change.value) : []
+  return [...(Array.isArray(entry.messaging) ? entry.messaging : []), ...fieldsWithEvents]
+}
+
 export function readMessages(payload: MetaDelivery | null, channel: 'instagram' | 'messenger', accountId: string) {
   if (payload?.object !== (channel === 'messenger' ? 'page' : 'instagram')) return []
   const messages: { senderId: string; messageId: string; text: string; sentAt: string; outgoing: boolean }[] = []
 
   if (!Array.isArray(payload.entry)) return messages
   for (const entry of payload.entry) {
-    if (!Array.isArray(entry?.messaging) || (channel === 'messenger' && entry.id !== accountId)) continue
-    for (const event of entry.messaging) {
+    if (!entry || (channel === 'messenger' && entry.id !== accountId)) continue
+    for (const event of eventsFor(entry, ['messages'])) {
       const message = event?.message
-      if (typeof message?.mid !== 'string' || !message.mid || message.is_deleted) continue
+      if (!event || typeof message?.mid !== 'string' || !message.mid || message.is_deleted) continue
       const outgoing = message.is_echo === true
       const senderId = outgoing ? event.recipient?.id : event.sender?.id
       const receivingAccount = outgoing ? event.sender?.id : event.recipient?.id
@@ -60,10 +67,7 @@ export function readAdReferrals(payload: MetaDelivery | null, channel: 'instagra
   if (payload?.object !== (channel === 'messenger' ? 'page' : 'instagram') || !Array.isArray(payload.entry)) return referrals
   for (const entry of payload.entry) {
     if (!entry || (channel === 'messenger' && entry.id !== accountId)) continue
-    const changes = Array.isArray(entry.changes) ? entry.changes.filter(change =>
-      ['messages', 'messaging_referrals', 'messaging_postbacks'].includes(change?.field ?? ''),
-    ).map(change => change.value) : []
-    for (const event of [...(Array.isArray(entry.messaging) ? entry.messaging : []), ...changes]) {
+    for (const event of eventsFor(entry, ['messages', 'messaging_referrals', 'messaging_postbacks'])) {
       if (!event || event.is_self || event.message?.is_echo || event.message?.is_deleted || event.recipient?.id !== accountId) continue
       const senderId = metaText(event.sender?.id)
       if (!senderId || senderId === accountId) continue

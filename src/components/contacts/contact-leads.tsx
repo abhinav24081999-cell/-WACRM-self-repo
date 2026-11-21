@@ -34,6 +34,7 @@ interface Lead {
   source_detail: string | null;
   ads_platform: 'meta' | 'google' | null;
   attribution: Record<string, unknown>;
+  form_answers: { name: string; values: string[] }[];
   meta_event_key: string | null;
   updated_at: string;
 }
@@ -53,7 +54,7 @@ interface ContactScope {
 
 const listPageSize = 25;
 const selectClass = 'h-8 w-full rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-ring';
-const leadColumns = 'id,title,status,source,source_detail,ads_platform,attribution,meta_event_key,updated_at';
+const leadColumns = 'id,title,status,source,source_detail,ads_platform,attribution,form_answers,meta_event_key,updated_at';
 
 export function ContactLeads({ accountId, contactId }: ContactScope) {
   const t = useTranslations('Contacts.leads');
@@ -105,6 +106,19 @@ export function ContactLeads({ accountId, contactId }: ContactScope) {
             loadPage(page);
           }}
         />
+        {!!lead?.form_answers?.length && (
+          <details className="rounded-lg border p-3" open>
+            <summary className="cursor-pointer font-medium">{t('formAnswers')}</summary>
+            <dl className="mt-3 space-y-2">
+              {lead.form_answers.map(({ name, values }) => (
+                <div key={name} className="break-words">
+                  <dt className="text-sm font-medium">{name.replaceAll('_', ' ')}</dt>
+                  {values.map((value, index) => <dd className="whitespace-pre-wrap text-sm" key={index}>{value}</dd>)}
+                </div>
+              ))}
+            </dl>
+          </details>
+        )}
         {lead && <LeadHistory key={`history:${lead.updated_at}`} leadId={lead.id} />}
       </div>
     );

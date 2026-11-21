@@ -55,19 +55,22 @@ export async function retrieveFormLead(id: string, token: string) {
     lead = await readGraphObject(id, 'id,field_data,form_id', token, 5000)
   }
   if (metaId(lead?.id) !== id || !Array.isArray(lead.field_data)) throw new Error('Invalid Meta lead response')
-  const answers = new Map<string, string>()
+  const answers = new Map<string, string[]>()
   for (const answer of lead.field_data) {
     if (typeof answer?.name !== 'string' || !Array.isArray(answer.values)) continue
-    answers.set(answer.name, metaText(answer.values[0]))
+    const name = metaText(answer.name)
+    const values = (answer.values as unknown[]).map(value => metaText(value, 4096)).filter(Boolean)
+    if (name && values.length) answers.set(name, [...(answers.get(name) ?? []), ...values])
   }
 
-  const rawPhone = answers.get('phone_number') ?? ''
-  const phone = parseInternationalPhone(rawPhone)
-  const email = answers.get('email') ?? ''
+  const first = (key: string) => metaText(answers.get(key)?.[0])
+  const phone = parseInternationalPhone(first('phone_number'))
+  const email = first('email')
   return {
-    name: answers.get('full_name') || [answers.get('first_name'), answers.get('last_name')].filter(Boolean).join(' ').slice(0, 255),
+    name: first('full_name') || metaText([first('first_name'), first('last_name')].filter(Boolean).join(' ')),
     phone: phone ? `+${phone}` : '',
     email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email.toLowerCase() : '',
+    formAnswers: [...answers].map(([name, values]) => ({ name, values })),
     attribution: fields({
       meta_platform: metaText(lead.platform),
       form_id: metaId(lead.form_id),
@@ -103,6 +106,7 @@ export async function captureFormLeads(
         p_phone: lead.phone,
         p_email: lead.email,
         p_attribution: attribution,
+        p_form_answers: lead.formAnswers,
       })
       if (error) throw error
     } catch (error) {

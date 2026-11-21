@@ -1,4 +1,6 @@
 ALTER TABLE public.leads ADD COLUMN meta_event_key text;
+ALTER TABLE public.leads ADD COLUMN form_answers jsonb NOT NULL DEFAULT '[]'::jsonb
+  CHECK (jsonb_typeof(form_answers) = 'array');
 CREATE UNIQUE INDEX leads_meta_event_key_idx ON public.leads (account_id, meta_event_key)
   WHERE meta_event_key IS NOT NULL;
 
@@ -34,7 +36,8 @@ RETURNS void LANGUAGE sql SET search_path = '' AS $$
 $$;
 
 CREATE FUNCTION public.record_meta_form_lead(
-  p_account_id uuid, p_lead_id text, p_name text, p_phone text, p_email text, p_attribution jsonb
+  p_account_id uuid, p_lead_id text, p_name text, p_phone text, p_email text, p_attribution jsonb,
+  p_form_answers jsonb
 )
 RETURNS void LANGUAGE plpgsql SET search_path = '' AS $$
 DECLARE
@@ -86,6 +89,8 @@ BEGIN
       WHEN 'instagram' THEN 'Instagram Instant Form'
       ELSE 'Meta Instant Form'
     END);
+  UPDATE public.leads SET form_answers = p_form_answers
+  WHERE account_id = p_account_id AND meta_event_key = 'meta_instant_form:' || p_lead_id;
 END;
 $$;
 
@@ -128,11 +133,11 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.record_meta_lead(uuid, uuid, text, text, jsonb, text),
-  public.record_meta_form_lead(uuid, text, text, text, text, jsonb),
+  public.record_meta_form_lead(uuid, text, text, text, text, jsonb, jsonb),
   public.record_meta_social_lead(uuid, text, text, text, text, text, jsonb)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.record_meta_lead(uuid, uuid, text, text, jsonb, text),
-  public.record_meta_form_lead(uuid, text, text, text, text, jsonb),
+  public.record_meta_form_lead(uuid, text, text, text, text, jsonb, jsonb),
   public.record_meta_social_lead(uuid, text, text, text, text, text, jsonb)
   TO service_role;
 

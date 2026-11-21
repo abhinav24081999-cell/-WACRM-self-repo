@@ -624,6 +624,7 @@
       "notLinkedToAccount": "프로필이 계정에 연결되어 있지 않습니다."
     },
     "leads": {
+      "formAnswers": "인스턴트 양식 답변",
       "add": "리드 추가",
       "back": "리드 목록으로",
       "loading": "불러오는 중…",

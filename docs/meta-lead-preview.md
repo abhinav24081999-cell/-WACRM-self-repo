@@ -3,6 +3,9 @@
 Use a test Supabase project and Meta test assets. Apply the social inbox,
 lead management and Meta lead migrations in order before testing webhooks.
 
+Apply the database migrations before enabling these webhook routes. For a
+fresh WACRM database, apply the earlier application migrations first.
+
 For Facebook and Instagram Instant Forms, configure these preview-only server variables.
 
 | Variable | Value |
@@ -30,7 +33,10 @@ token and its workspace UUID as Edge Function secrets if you want enrichment the
 
 Submit an Instant Form from a test Page and use test ad referrals for each
 channel. In **Contacts → contact → Leads**, check the source, status, external
-lead ID and available ad attribution. Replay each payload to check that its
+lead ID, available ad attribution and answers to custom form questions.
+Replay each payload to check that its
 lead appears once. An ad lookup failure should still leave the IDs supplied by
 the webhook. An ordinary chat should appear in the inbox without creating an
-ad lead.
+ad lead. If an ad-referred WhatsApp message and lead cannot be committed,
+the webhook sends a retryable response. Replies and automations run after
+acknowledgment.

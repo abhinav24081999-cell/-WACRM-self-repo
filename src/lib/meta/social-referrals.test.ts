@@ -30,3 +30,15 @@ it('captures Messenger ad postbacks without inventing an inbox message or counti
     } },
   ])
 })
+
+it('reads the conversation and attribution from an Instagram changes payload', () => {
+  const event = {
+    sender: { id: 'person' }, recipient: { id: 'account' }, timestamp: 1700000000000,
+    message: { mid: 'mid', text: 'Hello', referral: { source: 'ADS', ad_id: '555' } },
+  }
+  const payload = { object: 'instagram', entry: [{ changes: [{ field: 'messages', value: event }] }] }
+  expect(readMessages(payload, 'instagram', 'account')).toMatchObject([{ messageId: 'mid', text: 'Hello' }])
+  expect([...readAdReferrals(payload, 'instagram', 'account').values()]).toMatchObject([
+    { senderId: 'person', attribution: { ad_id: '555', referral_source: 'ADS' } },
+  ])
+})

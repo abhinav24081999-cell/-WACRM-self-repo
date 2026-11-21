@@ -624,6 +624,7 @@
       "notLinkedToAccount": "Seu perfil não está vinculado a uma conta."
     },
     "leads": {
+      "formAnswers": "Respostas do formulário instantâneo",
       "add": "Adicionar lead",
       "back": "Voltar aos leads",
       "loading": "Carregando…",

@@ -48,12 +48,18 @@ describe('Meta Instant Form webhook', () => {
   it('keeps long IDs exact, adds contact and ad data, and acknowledges a replay', async () => {
     const fetchGraph = vi.fn().mockResolvedValueOnce(Response.json({ id: leadId, platform: 'ig', field_data: [
       { name: 'full_name', values: ['Preview Lead'] }, { name: 'phone_number', values: ['+91 99900 00001'] },
+      { name: 'preferred_products', values: ['Insurance', 'Demat'] },
     ] })).mockResolvedValueOnce(Response.json({ name: 'Test ad', campaign_id: '444', adset_id: '333' }))
     vi.stubGlobal('fetch', fetchGraph)
 
     expect((await POST(delivery())).status).toBe(200)
     expect(rpc).toHaveBeenCalledExactlyOnceWith('record_meta_form_lead', {
       p_account_id: 'test-workspace', p_lead_id: leadId, p_name: 'Preview Lead', p_phone: '+919990000001', p_email: '',
+      p_form_answers: [
+        { name: 'full_name', values: ['Preview Lead'] },
+        { name: 'phone_number', values: ['+91 99900 00001'] },
+        { name: 'preferred_products', values: ['Insurance', 'Demat'] },
+      ],
       p_attribution: { external_lead_id: leadId, meta_page_id: '123', form_id: '99', ad_id: '555',
         meta_platform: 'ig', campaign_id: '444', ad_group_id: '333', ad_name: 'Test ad' },
     })
