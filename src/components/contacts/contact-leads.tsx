@@ -92,7 +92,7 @@ export function ContactLeads({ accountId, contactId }: ContactScope) {
     return (
       <div className="space-y-4">
         <LeadForm
-          key={lead?.updated_at ?? 'new'}
+          key={`editor:${lead?.updated_at ?? 'new'}`}
           accountId={accountId}
           contactId={contactId}
           lead={lead}
@@ -103,7 +103,7 @@ export function ContactLeads({ accountId, contactId }: ContactScope) {
             loadPage(page);
           }}
         />
-        {lead && <LeadHistory key={lead.updated_at} leadId={lead.id} />}
+        {lead && <LeadHistory key={`history:${lead.updated_at}`} leadId={lead.id} />}
       </div>
     );
   }
