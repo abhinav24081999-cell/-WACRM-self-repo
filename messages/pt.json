@@ -1687,6 +1687,48 @@
       "descriptionLabel": "Descrição do fluxo"
     }
   },
+  "ConversionFeedback": {
+    "title": "Feedback de conversão",
+    "liveEnabled": "O envio em produção está habilitado.",
+    "testOnly": "Somente modo de teste.",
+    "configured": "Credenciais configuradas para {sources}.",
+    "connectionNeeded": "Adicione as credenciais do workspace e do provedor para processar eventos.",
+    "loadError": "Não foi possível carregar as regras ou o histórico.",
+    "adminOnly": "Somente administradores do workspace podem gerenciar conversões.",
+    "source": "Origem do lead",
+    "stage": "Etapa do CRM",
+    "googleAction": "ID da ação de conversão do Google",
+    "metaEvent": "Nome do evento da Meta",
+    "delivery": "Modo de envio",
+    "manual": "Manual",
+    "automatic": "Automático",
+    "off": "Desativado",
+    "testMode": "Modo de teste",
+    "liveMode": "Modo de produção",
+    "save": "Salvar regra",
+    "saved": "Regra salva.",
+    "saveError": "Não foi possível salvar a regra.",
+    "history": "Histórico de envios",
+    "refresh": "Atualizar",
+    "process": "Processar fila",
+    "empty": "Nenhuma tentativa de conversão ainda.",
+    "processed": "{count} eventos processados.",
+    "runError": "Não foi possível processar a fila.",
+    "attempts": "{count} tentativas",
+    "queue": "Colocar conversão na fila",
+    "queued": "A conversão está disponível no histórico.",
+    "missingMilestone": "Configure uma regra para uma etapa alcançada por este lead.",
+    "queueError": "Não foi possível colocar a conversão na fila.",
+    "states": {
+      "pending": "Pendente",
+      "sending": "Enviando",
+      "retrying": "Tentando novamente",
+      "accepted": "Aceito pela API",
+      "tested": "Testado",
+      "failed": "Falhou",
+      "skipped": "Ignorado"
+    }
+  },
   "Settings": {
     "pageTitle": "Configurações",
     "pageDesc": "Tudo em um só lugar — sua conta e seu espaço de trabalho. Escolha uma seção para gerenciá-la.",
@@ -2055,7 +2097,8 @@
       "deals": "Negócios e moeda",
       "inbox": "Caixa de entrada",
       "members": "Membros da equipe",
-      "api": "Chaves de API"
+      "api": "Chaves de API",
+      "conversion-feedback": "Feedback de conversão"
     },
     "groups": {
       "account": "Conta",

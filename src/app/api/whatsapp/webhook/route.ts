@@ -451,6 +451,7 @@ async function processWebhook(body: WebhookDelivery, followUps?: (() => Promise<
           // and losing attachments is the failure mode worth avoiding.
           config.mirror_inbound_media !== false,
           followUps,
+          config.waba_id ?? entry.id,
         )
       }
     }
@@ -639,6 +640,7 @@ async function processMessage(
   // See parseMessageContent for what it turns off.
   mirrorMedia: boolean,
   followUps?: (() => Promise<void>)[],
+  whatsappBusinessAccountId?: string,
 ) {
   // Phone number OR business-scoped user ID — Meta sends only the
   // latter for a sender who has adopted a WhatsApp username (#519).
@@ -757,6 +759,9 @@ async function processMessage(
 
   const receivedAt = new Date(parseInt(message.timestamp) * 1000).toISOString()
   const referral = metaLeadWorkspace() === accountId ? adReferral(message) : {}
+  if (Object.keys(referral).length && whatsappBusinessAccountId && /^\d{1,40}$/.test(whatsappBusinessAccountId)) {
+    referral.whatsapp_business_account_id = whatsappBusinessAccountId
+  }
   const attribution = Object.keys(referral).length ? await enrichAd(referral, adsTokenFor(accountId)) : null
 
   // Idempotent insert. Meta retries webhook deliveries (a slow ack, a

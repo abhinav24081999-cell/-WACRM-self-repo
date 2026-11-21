@@ -31,9 +31,9 @@ export function referralAttribution(referral: Record<string, unknown>, whatsapp 
   })
 }
 
-export async function readGraphObject(id: string, selection: string, token: string, timeout: number) {
+export async function readGraphObject(id: string, selection: string, token: string, timeout: number, query: Record<string, string> = {}) {
   const url = new URL(`https://graph.facebook.com/v27.0/${id}`)
-  url.searchParams.set('fields', selection)
+  url.search = new URLSearchParams({ ...query, fields: selection }).toString()
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',

@@ -19,6 +19,7 @@ import { DealsSettings } from '@/components/settings/deals-settings';
 import { InboxSettings } from '@/components/settings/inbox-settings';
 import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
+import { ConversionFeedbackSettings } from '@/components/settings/conversion-feedback-settings';
 import {
   resolveSection,
   type SettingsSection,
@@ -83,6 +84,7 @@ function SettingsPageInner() {
     deals: <DealsSettings />,
     members: <MembersTab />,
     api: <ApiKeysSettings />,
+    'conversion-feedback': <ConversionFeedbackSettings />,
   };
 
   return (

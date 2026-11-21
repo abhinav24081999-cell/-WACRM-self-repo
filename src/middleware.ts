@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  if (['/api/meta/leads/webhook', '/api/google/leads/webhook', '/api/leads/website'].includes(request.nextUrl.pathname)) {
+  if (['/api/meta/leads/webhook', '/api/google/leads/webhook', '/api/leads/website', '/api/conversion-feedback/cron'].includes(request.nextUrl.pathname)) {
     return NextResponse.next()
   }
 
@@ -76,7 +76,7 @@ export async function middleware(request: NextRequest) {
   // Protected pages - redirect to login if not authenticated
   // Every top-level route under src/app/(dashboard)/ belongs here —
   // middleware.test.ts reads that directory and fails on a missing one.
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/flows', '/agents', '/notifications', '/settings']
+  const protectedPaths = ['/dashboard', '/ads-performance', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/flows', '/agents', '/notifications', '/settings']
   if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
