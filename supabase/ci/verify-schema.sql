@@ -163,6 +163,15 @@ BEGIN
     RAISE EXCEPTION 'anon can execute dashboard_overview — migration 059 grants are wrong';
   END IF;
 
+  IF to_regclass('public.conversion_feedback_events') IS NULL
+    OR to_regprocedure('public.ads_performance_rollup(uuid,date,date,text,text,text,text,uuid)') IS NULL THEN
+    RAISE EXCEPTION 'conversion feedback or ads reporting did not apply';
+  END IF;
+  IF has_function_privilege('anon', 'public.ads_performance_rollup(uuid,date,date,text,text,text,text,uuid)', 'EXECUTE')
+    OR has_column_privilege('authenticated', 'public.conversion_feedback_events', 'identifiers', 'SELECT') THEN
+    RAISE EXCEPTION 'conversion feedback or ads reporting grants are too broad';
+  END IF;
+
   RAISE NOTICE 'schema verification passed';
 END
 $$;

@@ -1,10 +1,12 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
 import { createClient } from '@/lib/supabase/client'
+import { useCan } from '@/hooks/use-can'
 import { useAuth } from '@/hooks/use-auth'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
@@ -48,6 +50,7 @@ function DashboardPageInner() {
   const searchParams = useSearchParams()
   const range = parseOverviewRange(searchParams.get('range'))
   const { defaultCurrency, profile } = useAuth()
+  const canViewAdPerformance = useCan('edit-settings')
 
   const [overview, setOverview] = useState<DashboardOverview | null>(null)
   const [failed, setFailed] = useState(false)
@@ -150,6 +153,12 @@ function DashboardPageInner() {
         range={range}
         onRangeChange={handleRangeChange}
       />
+
+      {canViewAdPerformance && (
+        <div className="flex justify-end">
+          <Button variant="outline" render={<Link href="/ads-performance" />}>Ads performance</Button>
+        </div>
+      )}
 
       {data && needsSetup(data.setup) ? (
         <SetupChecklist setup={data.setup} />

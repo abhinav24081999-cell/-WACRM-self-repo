@@ -9,10 +9,12 @@ export type ConversionEvent = {
   identifiers: Record<string, string>
   attempts: number
   attempt_limit: number
+  provider_target?: string | null
 }
 
 export class DeliveryError extends Error {
-  constructor(readonly reason: string, readonly retryable = false) {
+  constructor(readonly reason: string, readonly retryable = false, readonly uncertain = false,
+    readonly status?: number, readonly receipt?: string) {
     super(reason)
   }
 }
@@ -29,6 +31,10 @@ export function liveFeedbackEnabled() {
   return process.env.VERCEL_ENV !== 'preview' && process.env.CONVERSION_FEEDBACK_ALLOW_LIVE === 'true'
 }
 
+export function isMessagingConversion(source: string) {
+  return source === 'whatsapp' || source === 'instagram_dm' || source === 'messenger'
+}
+
 function numeric(value?: string) {
   return /^\d{1,40}$/.test(value ?? '') ? value : undefined
 }
@@ -43,6 +49,10 @@ function metaConfig(source: string) {
 
 function googleAccount() {
   return numeric(process.env.CONVERSION_GOOGLE_CUSTOMER_ID?.trim().replaceAll('-', ''))
+}
+
+export function conversionTarget(source: string) {
+  return source === 'google_lead_form' || source === 'website_form' ? googleAccount() : metaConfig(source).dataset
 }
 
 export function configuredSources() {
@@ -103,15 +113,15 @@ async function post(url: string, headers: Record<string, string>, body: string) 
   }
 }
 
-export async function googleAccessToken() {
-  const issuer = process.env.CONVERSION_GOOGLE_CLIENT_EMAIL?.trim()
-  const key = process.env.CONVERSION_GOOGLE_PRIVATE_KEY?.replaceAll('\\n', '\n').trim()
+export async function googleAccessToken(scope = 'https://www.googleapis.com/auth/datamanager',
+  issuer = process.env.CONVERSION_GOOGLE_CLIENT_EMAIL?.trim(),
+  key = process.env.CONVERSION_GOOGLE_PRIVATE_KEY?.replaceAll('\\n', '\n').trim()) {
   if (!issuer || !key) throw new DeliveryError('google_credentials_missing')
   const url = 'https://oauth2.googleapis.com/token'
   const now = Math.floor(Date.now() / 1000)
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
   const jwt = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode({
-    iss: issuer, scope: 'https://www.googleapis.com/auth/datamanager', aud: url, iat: now, exp: now + 3600,
+    iss: issuer, scope, aud: url, iat: now, exp: now + 3600,
   })}`
   let assertion: string
   try {
@@ -129,6 +139,9 @@ export async function googleAccessToken() {
 
 export async function sendConversion(event: ConversionEvent, googleToken: () => Promise<string>) {
   const headers = (token: string) => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' })
+  if (event.provider_target && event.provider_target !== conversionTarget(event.source)) {
+    throw new DeliveryError('provider_destination_changed')
+  }
   if (event.source === 'google_lead_form' || event.source === 'website_form') {
     const customerId = googleAccount()
     if (!customerId) throw new DeliveryError('google_customer_missing')
@@ -147,15 +160,34 @@ export async function sendConversion(event: ConversionEvent, googleToken: () => 
     (event.source === 'whatsapp' ? event.identifiers.whatsapp_business_account_id : event.identifiers.account_id))) {
     throw new DeliveryError('meta_business_account_mismatch')
   }
-  if (Date.now() - Date.parse(event.event_time) > 7 * 24 * 60 * 60 * 1000) throw new DeliveryError('meta_event_expired')
+  const occurredAt = Date.parse(event.event_time)
+  const createdAt = Date.parse(event.identifiers.provider_created_at)
+  if (!Number.isFinite(occurredAt) || occurredAt > Date.now()) throw new DeliveryError('meta_event_time_invalid')
+  if (Number.isFinite(createdAt) && Math.floor(occurredAt / 1000) < Math.floor(createdAt / 1000)) {
+    throw new DeliveryError('meta_event_precedes_lead')
+  }
+  if (Date.now() - occurredAt > 7 * 24 * 60 * 60 * 1000) throw new DeliveryError('meta_event_expired')
   const testCode = process.env[`CONVERSION_META_${metaRoutes[event.source]}_TEST_CODE`]?.trim()
   if (event.test_mode && !testCode) throw new DeliveryError('meta_test_code_missing')
   const payload = { data: [metaEventPayload(event)], ...(event.test_mode && { test_event_code: testCode }) }
-  const result = await post(`https://graph.facebook.com/v27.0/${dataset}/events`, headers(token), JSON.stringify(payload))
+  const messaging = isMessagingConversion(event.source)
+  let result
+  try {
+    result = await post(`https://graph.facebook.com/v27.0/${dataset}/events`, headers(token), JSON.stringify(payload))
+  } catch (error) {
+    if (messaging) throw new DeliveryError('messaging_delivery_uncertain', false, true)
+    throw error
+  }
   if (!result.ok || result.data?.error || result.data?.events_received !== 1) {
     const code = result.data?.error?.code
+    const receipt = result.data?.error?.fbtrace_id ?? result.data?.fbtrace_id
+    const trace = typeof receipt === 'string' ? receipt.slice(0, 255) : undefined
+    if (messaging && (result.status === 408 || result.status >= 500 || (result.ok && !result.data?.error))) {
+      throw new DeliveryError('messaging_delivery_uncertain', false, true, result.status, trace)
+    }
     throw new DeliveryError(Number.isInteger(code) ? `meta_error_${code}` : `meta_http_${result.status}`,
-      canRetry(result.status) || result.data?.error?.is_transient === true || [4, 17, 32, 613].includes(code))
+      canRetry(result.status) || result.data?.error?.is_transient === true || [4, 17, 32, 613].includes(code),
+      false, result.status, trace)
   }
   return typeof result.data.fbtrace_id === 'string' ? result.data.fbtrace_id.slice(0, 255) : null
 }

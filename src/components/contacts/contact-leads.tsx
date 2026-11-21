@@ -175,6 +175,7 @@ function QueueLeadFeedback({ lead }: { lead: Lead }) {
   const stages = google ? ['qualified', 'converted'] : messaging ? ['new', 'qualified'] : ['new', 'qualified', 'converted'];
   const [stage, setStage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmedSubmission, setConfirmedSubmission] = useState(false);
   if (!canQueue || (!google && !messaging && lead.source !== 'meta_instant_form')) return null;
 
   const selectedStage = stage && stages.includes(stage) ? stage : stages.includes(lead.status) ? lead.status : stages[0];
@@ -183,7 +184,7 @@ function QueueLeadFeedback({ lead }: { lead: Lead }) {
     try {
       const response = await fetch('/api/conversion-feedback', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'queue', leadId: lead.id, stage: selectedStage }),
+        body: JSON.stringify({ action: 'queue', leadId: lead.id, stage: selectedStage, confirmedSubmission }),
       });
       if (response.ok) toast.success(t('queued'));
       else toast.error(t(response.status === 422 ? 'missingMilestone' : 'queueError'));
@@ -200,9 +201,14 @@ function QueueLeadFeedback({ lead }: { lead: Lead }) {
           {stages.map(value => <option value={value} key={value}>{statusesT(value)}</option>)}
         </select>
       </div>
-      <Button type="button" size="sm" onClick={() => void queue()} disabled={busy}>{t('queue')}</Button>
+      <Button type="button" size="sm" onClick={() => void queue()}
+        disabled={busy || (messaging && selectedStage === 'new' && !confirmedSubmission)}>{t('queue')}</Button>
       <Link className="self-center text-sm underline" href="/settings?tab=conversion-feedback">{t('history')}</Link>
     </div>
+    {messaging && selectedStage === 'new' && <label className="flex items-center gap-2 text-sm">
+      <input type="checkbox" checked={confirmedSubmission} onChange={event => setConfirmedSubmission(event.target.checked)} />
+      The customer submitted a lead in this conversation.
+    </label>}
   </div>;
 }
 

@@ -14,7 +14,7 @@ type Source = (typeof sources)[number];
 type Stage = 'new' | 'qualified' | 'converted';
 type Delivery = 'manual' | 'automatic' | 'off';
 type Rule = { source: Source; stage: Stage; destination: string; delivery: Delivery; test_mode: boolean };
-type Event = Omit<Rule, 'delivery'> & { id: string; event_time: string; state: string; attempts: number; reason: string | null; response_id: string | null };
+type Event = Omit<Rule, 'delivery'> & { id: string; event_time: string; state: string; attempts: number; reason: string | null; response_id: string | null; provider_target: string | null; http_status: number | null; sent_at: string | null };
 type Connection = { available: boolean; sources: Source[]; live: boolean };
 
 const initialRule: Rule = { source: 'meta_instant_form', stage: 'qualified', destination: '', delivery: 'manual', test_mode: true };
@@ -38,6 +38,30 @@ export function ConversionFeedbackSettings() {
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [status, setStatus] = useState('');
+  const [formId, setFormId] = useState('');
+  const [formCursor, setFormCursor] = useState('');
+  const [importStatus, setImportStatus] = useState('');
+
+  async function importForm(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const response = await fetch('/api/meta/leads/backfill', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formId: formId.trim(), ...(formCursor && { after: formCursor }) }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      setFormCursor(result.failed ? formCursor : result.next ?? '');
+      setImportStatus(`${result.scanned} read · ${result.imported} processed · ${result.existing} already in WACRM · ${result.failed} failed.${
+        result.failed ? ' Retry the same page to recover failed leads.' : result.next ? ' More leads are available.' : ' End of form results.'}`);
+      setRevision(value => value + 1);
+    } catch (error) {
+      setImportStatus(error instanceof Error ? error.message : 'Meta form import failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!accountId || !canEdit) return;
@@ -45,7 +69,7 @@ export function ConversionFeedbackSettings() {
     const db = createClient();
     void Promise.all([
       db.from('conversion_feedback_rules').select('source,stage,destination,delivery,test_mode').eq('account_id', accountId).order('source'),
-      db.from('conversion_feedback_events').select('id,source,stage,destination,test_mode,event_time,state,attempts,reason,response_id')
+      db.from('conversion_feedback_events').select('id,source,stage,destination,test_mode,event_time,state,attempts,reason,response_id,provider_target,http_status,sent_at')
         .eq('account_id', accountId).order('created_at', { ascending: false }).limit(25),
       fetch('/api/conversion-feedback', { cache: 'no-store' }).then(response => response.ok ? response.json() : null),
     ]).then(([mapping, log, setup]) => {
@@ -65,11 +89,12 @@ export function ConversionFeedbackSettings() {
     event.preventDefault();
     if (!accountId || busy) return;
     const destination = messaging ? (rule.stage === 'new' ? 'LeadSubmitted' : 'QualifiedLead') : rule.destination.trim();
+    const delivery = messaging && rule.stage === 'new' && rule.delivery === 'automatic' ? 'manual' : rule.delivery;
     setBusy(true);
     try {
       const response = await fetch('/api/conversion-feedback', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save', rule: { ...rule, destination } }),
+        body: JSON.stringify({ action: 'save', rule: { ...rule, destination, delivery } }),
       });
       setStatus(t(response.ok ? 'saved' : 'saveError'));
       if (response.ok) setRevision(value => value + 1);
@@ -114,14 +139,17 @@ export function ConversionFeedbackSettings() {
           <div className="space-y-1">
             <Label htmlFor="conversion-stage">{t('stage')}</Label>
             <select id="conversion-stage" className={selectClass} value={rule.stage}
-              onChange={event => setRule({ ...rule, stage: event.target.value as Stage })}>
+              onChange={event => {
+                const stage = event.target.value as Stage;
+                setRule({ ...rule, stage, delivery: messaging && stage === 'new' && rule.delivery === 'automatic' ? 'manual' : rule.delivery });
+              }}>
               {stages.map(value => <option key={value} value={value}>{lead(`statuses.${value}`)}</option>)}
             </select>
           </div>
           <div className="space-y-1">
             <Label htmlFor="conversion-destination">{t(isGoogle(rule.source) ? 'googleAction' : 'metaEvent')}</Label>
             <Input id="conversion-destination" required readOnly={messaging}
-              pattern={isGoogle(rule.source) ? '[1-9][0-9]{0,19}' : '[A-Za-z][A-Za-z0-9_]{0,39}'}
+              pattern={isGoogle(rule.source) ? '[1-9][0-9]{0,19}' : '[A-Za-z][A-Za-z0-9_ ]{0,79}'}
               value={messaging ? (rule.stage === 'new' ? 'LeadSubmitted' : 'QualifiedLead') : rule.destination}
               onChange={event => setRule({ ...rule, destination: event.target.value })} />
           </div>
@@ -129,7 +157,8 @@ export function ConversionFeedbackSettings() {
             <Label htmlFor="conversion-delivery">{t('delivery')}</Label>
             <select id="conversion-delivery" className={selectClass} value={rule.delivery}
               onChange={event => setRule({ ...rule, delivery: event.target.value as Delivery })}>
-              {(['manual', 'automatic', 'off'] as const).map(value => <option key={value} value={value}>{t(value)}</option>)}
+              {(['manual', 'automatic', 'off'] as const).map(value => <option key={value} value={value}
+                disabled={value === 'automatic' && messaging && rule.stage === 'new'}>{t(value)}</option>)}
             </select>
           </div>
           <label className="flex items-center gap-2 text-sm">
@@ -150,6 +179,19 @@ export function ConversionFeedbackSettings() {
         {status && <p className="text-sm" role="status">{status}</p>}
       </section>
       <section className="space-y-3 rounded-lg border p-4">
+        <h2 className="text-lg font-semibold">Recover Meta Instant Form leads</h2>
+        <p className="text-sm text-muted-foreground">Import missed leads from the connected Facebook Page in batches of 20.</p>
+        <form onSubmit={importForm} className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="meta-backfill-form">Instant Form ID</Label>
+            <Input id="meta-backfill-form" inputMode="numeric" pattern="[0-9]{1,40}" required value={formId}
+              onChange={event => { setFormId(event.target.value); setFormCursor(''); setImportStatus(''); }} />
+          </div>
+          <Button type="submit" disabled={busy}>{formCursor ? 'Import next batch' : 'Import leads'}</Button>
+        </form>
+        {importStatus && <p className="text-sm" role="status">{importStatus}</p>}
+      </section>
+      <section className="space-y-3 rounded-lg border p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">{t('history')}</h2>
           <div className="flex gap-2">
@@ -162,11 +204,14 @@ export function ConversionFeedbackSettings() {
           {events.map(item => <li key={item.id} className="space-y-1 py-3 text-sm">
             <div className="flex flex-wrap justify-between gap-2">
               <span>{lead(`sources.${item.source}`)} · {lead(`statuses.${item.stage}`)}</span>
-              <strong>{t(`states.${item.state}`)}</strong>
+              <strong>{item.state === 'needs_review' ? 'Needs review' : t(`states.${item.state}`)}</strong>
             </div>
             <div className="text-xs text-muted-foreground">{item.destination} · {t(item.test_mode ? 'testMode' : 'liveMode')} · {format.dateTime(new Date(item.event_time), 'short')} · {t('attempts', { count: item.attempts })}</div>
             {item.reason && <div className="break-all text-xs text-muted-foreground">{item.reason}</div>}
             {item.response_id && <div className="break-all text-xs text-muted-foreground">{item.response_id}</div>}
+            {item.provider_target && <div className="text-xs text-muted-foreground">Destination {item.provider_target}
+              {item.http_status && ` · HTTP ${item.http_status}`}
+              {item.sent_at && ` · Sent ${format.dateTime(new Date(item.sent_at), 'short')}`}</div>}
             {item.state === 'failed' && <Button type="button" size="sm" variant="outline" disabled={busy || !connection?.available}
               onClick={() => void run(item.id)}>{lead('retry')}</Button>}
           </li>)}

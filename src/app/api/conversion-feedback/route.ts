@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     if (body?.action === 'save') {
       const { source, stage, destination, delivery, test_mode } = body.rule ?? {}
       if (typeof source !== 'string' || !['new', 'qualified', 'converted'].includes(stage) ||
-        typeof destination !== 'string' || !/^[a-z\d_]{1,40}$/i.test(destination) ||
+        typeof destination !== 'string' || !/^[a-z\d_ ]{1,80}$/i.test(destination) ||
         !['manual', 'automatic', 'off'].includes(delivery) || typeof test_mode !== 'boolean') {
         return new Response(null, { status: 400 })
       }
@@ -54,6 +54,15 @@ export async function POST(request: Request) {
     if (body?.action !== 'queue' || typeof body.leadId !== 'string' ||
       !uuid.test(body.leadId) ||
       !['new', 'qualified', 'converted'].includes(body.stage)) return new Response(null, { status: 400 })
+
+    if (body.stage === 'new' && body.confirmedSubmission !== true) {
+      const { data: lead, error } = await supabaseAdmin().from('leads').select('source')
+        .eq('id', body.leadId).eq('account_id', accountId).maybeSingle()
+      if (error) return new Response(null, { status: 503 })
+      if (lead && ['whatsapp', 'instagram_dm', 'messenger'].includes(lead.source)) {
+        return Response.json({ error: 'confirm_messaging_submission' }, { status: 422 })
+      }
+    }
 
     const { data, error } = await supabaseAdmin().rpc('request_conversion_feedback', {
       p_account_id: accountId, p_lead_id: body.leadId, p_stage: body.stage,

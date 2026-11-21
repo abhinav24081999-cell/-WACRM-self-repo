@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/conversion-feedback/cron", "schedule": "0 2 * * *" }
+  ]
+}
