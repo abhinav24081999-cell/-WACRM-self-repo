@@ -13,6 +13,7 @@ import type { Conversation, ConversationStatus, Tag } from "@/types";
 import { Search, ChevronDown, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useLocale, useTranslations } from "next-intl";
+import { channelLabel, channelLabels, type InboxChannel } from "@/lib/social/channels";
 import { getDateLocale } from "@/i18n/date-locale";
 import { Input } from "@/components/ui/input";
 import {
@@ -68,6 +69,7 @@ export function ConversationList({
   ], [t]);
 
   const [search, setSearch] = useState("");
+  const [channel, setChannel] = useState<InboxChannel | "all">("all");
   const [filter, setFilter] = useState<InboxFilter>(initialFilter);
   const [now, setNow] = useState(() => Date.now());
 
@@ -170,6 +172,9 @@ export function ConversationList({
 
   const filtered = useMemo(() => {
     let result = applyInboxFilter(conversations, filter, now);
+    if (channel !== "all") {
+      result = result.filter((conversation) => (conversation.channel ?? "whatsapp") === channel);
+    }
 
     // Contact-based filters (tags via OR logic, exact company match).
     if (selectedTagIds.length > 0 || selectedCompany !== null) {
@@ -192,7 +197,7 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, now, search, selectedTagIds, selectedCompany]);
+  }, [conversations, filter, channel, now, search, selectedTagIds, selectedCompany]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -241,6 +246,17 @@ export function ConversationList({
         </div>
 
         <div className="flex flex-wrap items-center gap-1">
+          <select
+            aria-label={t("channelFilter")}
+            value={channel}
+            onChange={(event) => setChannel(event.target.value as InboxChannel | "all")}
+            className="h-7 rounded-md border border-border bg-card px-2 text-xs text-muted-foreground"
+          >
+            <option value="all">{t("allChannels")}</option>
+            {(Object.keys(channelLabels) as InboxChannel[]).map((value) => (
+              <option key={value} value={value}>{channelLabels[value]}</option>
+            ))}
+          </select>
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center justify-center h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
                 {activeFilter?.label ?? t("filterAll")}
@@ -485,6 +501,9 @@ function ConversationItem({
           </span>
           <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
         </div>
+        <p className="truncate text-[11px] text-muted-foreground">
+          {channelLabel(conversation.channel, conversation.channel_account_label)}
+        </p>
         <div className="mt-0.5 flex items-center justify-between gap-2">
           <p className="truncate text-xs text-muted-foreground">
             {conversation.last_message_text || t("noMessagesYet")}

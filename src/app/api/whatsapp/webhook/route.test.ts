@@ -79,17 +79,19 @@ vi.mock('@supabase/supabase-js', () => ({
             }),
           }
         case 'conversations':
-          // findOrCreateConversation: select().eq().eq().order().limit()
+          // findOrCreateConversation: select().eq().eq().eq('channel', 'whatsapp').order().limit()
           return {
             select: () => ({
               eq: () => ({
                 eq: () => ({
-                  order: () => ({
-                    limit: () =>
-                      Promise.resolve({
-                        data: [h.state.conversation],
-                        error: null,
-                      }),
+                  eq: (column: string, channel: string) => ({
+                    order: () => ({
+                      limit: () =>
+                        Promise.resolve({
+                          data: column === 'channel' && channel === 'whatsapp' ? [h.state.conversation] : [],
+                          error: null,
+                        }),
+                    }),
                   }),
                 }),
               }),

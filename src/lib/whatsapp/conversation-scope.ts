@@ -37,14 +37,14 @@ export async function assertConversationInAccount(
 ): Promise<void> {
   const { data, error } = await db
     .from('conversations')
-    .select('id')
+    .select('id, channel')
     .eq('id', conversationId)
     .eq('account_id', accountId)
     .maybeSingle()
   if (error) {
     throw new Error(t('send.conversationLookupFailed', { message: error.message }))
   }
-  if (!data) {
+  if (!data || (data.channel && data.channel !== 'whatsapp')) {
     throw new Error(t('send.conversationNotFound'))
   }
 }
