@@ -1,4 +1,5 @@
 import type { AiProvider } from './types'
+import { normalizeN8nUrl } from './providers/n8n'
 import { normalizeOpenAiCompatibleBaseUrl } from './providers/openai-compatible'
 
 export interface StoredAiCredentials {
@@ -23,6 +24,13 @@ export function canReuseStoredAiKey(
   baseUrl: string | null,
 ): boolean {
   if (!stored || stored.provider !== provider) return false
+  if (provider === 'n8n') {
+    try {
+      return normalizeN8nUrl(stored.base_url ?? '') === normalizeN8nUrl(baseUrl ?? '')
+    } catch {
+      return false
+    }
+  }
   if (provider !== 'openai_compatible') return true
   return sameEndpoint(stored.base_url, baseUrl)
 }

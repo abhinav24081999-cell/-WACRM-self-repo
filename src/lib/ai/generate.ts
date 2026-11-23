@@ -4,10 +4,14 @@ import {
   type AiUsage,
   type ChatMessage,
   type GenerateResult,
+  type ProviderResult,
 } from './types'
+import { qualificationInstructions, readAiAssessment } from './qualification'
 import { HANDOFF_SENTINEL, aiRequestTimeoutMs } from './defaults'
 import { generateOpenAi } from './providers/openai'
 import { generateOpenAiCompatible } from './providers/openai-compatible'
+import { generateN8n } from './providers/n8n'
+import { generateGemini } from './providers/gemini'
 import { generateAnthropic } from './providers/anthropic'
 
 export interface GenerateArgs {
@@ -16,6 +20,8 @@ export interface GenerateArgs {
   systemPrompt: string
   /** Recent conversation turns, oldest first. */
   messages: ChatMessage[]
+  withAssessment?: boolean
+  externalMode?: 'test' | 'live'
 }
 
 /**
@@ -26,22 +32,36 @@ export interface GenerateArgs {
 export async function generateReply(args: GenerateArgs): Promise<GenerateResult> {
   const { config, systemPrompt, messages } = args
   const timeoutMs = aiRequestTimeoutMs()
+  const assessmentRequested = args.withAssessment && !!config.qualificationCriteria
+  const instructions = [
+    systemPrompt,
+    config.agentPurpose && 'Use this approved agent purpose: ' + config.agentPurpose,
+    config.agentLanguage && config.agentLanguage !== 'auto' && 'Respond in ' + config.agentLanguage + '.',
+    assessmentRequested && qualificationInstructions(config.qualificationCriteria!),
+  ].filter(Boolean).join('\n\n')
   const providerArgs = {
     apiKey: config.apiKey,
     model: config.model,
-    systemPrompt,
+    systemPrompt: instructions,
     messages,
     timeoutMs,
+    jsonOutput: assessmentRequested,
     baseUrl: config.baseUrl,
   }
 
-  let result: { text: string; usage: AiUsage | null }
+  let result: ProviderResult
   switch (config.provider) {
     case 'openai':
       result = await generateOpenAi(providerArgs)
       break
     case 'openai_compatible':
       result = await generateOpenAiCompatible(providerArgs)
+      break
+    case 'n8n':
+      result = await generateN8n(providerArgs, args.externalMode ?? 'test')
+      break
+    case 'gemini':
+      result = await generateGemini(providerArgs)
       break
     case 'anthropic':
       result = await generateAnthropic(providerArgs)
@@ -53,7 +73,23 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
       })
   }
 
-  return parseGeneration(result.text, result.usage)
+  if (!assessmentRequested) return parseGeneration(result.text, result.usage)
+  if (config.provider === 'n8n') return { ...parseGeneration(result.text, result.usage), assessment: result.assessment }
+
+  try {
+    const raw = JSON.parse(result.text.replace(/^```(?:json)?\s*|\s*```$/g, ''))
+    if (typeof raw.reply === 'string' && typeof raw.handoff === 'boolean' && raw.reply.length <= 4096) {
+      return {
+        text: raw.handoff ? '' : raw.reply.trim(),
+        handoff: raw.handoff,
+        usage: result.usage,
+        assessment: readAiAssessment(raw.assessment, messages),
+      }
+    }
+  } catch {
+    // Never send a malformed structured response to a contact.
+  }
+  throw new AiError('The agent returned an invalid qualification response.', { code: 'assessment_invalid' })
 }
 
 /**

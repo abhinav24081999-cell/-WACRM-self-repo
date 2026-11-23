@@ -136,10 +136,12 @@ export async function dispatchInboundToAiReply(
       knowledge,
     })
 
-    const { text, handoff, usage } = await generateReply({
+    const { text, handoff, usage, assessment } = await generateReply({
       config,
       systemPrompt,
       messages,
+      externalMode: 'live',
+      withAssessment: true,
     })
 
     // Record token spend on the account's BYO key. Fire-and-forget so it
@@ -155,6 +157,25 @@ export async function dispatchInboundToAiReply(
       model: config.model,
       usage,
     })
+
+    if (config.provider === 'n8n' || assessment) {
+      const current = await loadAiConfig(db, accountId)
+      if (!current?.autoReplyEnabled || current.provider !== config.provider ||
+          current.baseUrl !== config.baseUrl || current.apiKey !== config.apiKey ||
+          current.model !== config.model || current.qualificationCriteria !== config.qualificationCriteria) return
+    }
+
+    if (assessment && inboundMessageId) {
+      const { error } = await db.rpc('record_ai_contact_assessment', {
+        p_account_id: accountId,
+        p_conversation_id: conversationId,
+        p_message_external_id: inboundMessageId,
+        p_outcome: assessment.outcome,
+        p_evidence: assessment.evidence,
+        p_follow_up: assessment.followUp,
+      })
+      if (error) console.error('[ai auto-reply] could not record assessment', error.code)
+    }
 
     if (handoff || !text) {
       // The model can't (or shouldn't) answer — stop auto-replying on

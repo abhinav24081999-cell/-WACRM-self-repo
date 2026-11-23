@@ -6,7 +6,9 @@
 // whether the account is on OpenAI or Anthropic.
 // ============================================================
 
-export type AiProvider = 'openai' | 'anthropic' | 'openai_compatible'
+import type { AiAssessment } from './qualification'
+
+export type AiProvider = 'openai' | 'anthropic' | 'gemini' | 'n8n' | 'openai_compatible'
 
 /**
  * Account AI setup, decrypted and ready to use. Produced by
@@ -31,6 +33,9 @@ export interface AiConfig {
    *  knowledge base is embedded and semantic retrieval turns on; when
    *  null, retrieval falls back to lexical full-text search. */
   embeddingsApiKey: string | null
+  qualificationCriteria?: string | null
+  agentPurpose?: string | null
+  agentLanguage?: string | null
 }
 
 /** A single conversation turn in the shape both providers accept. */
@@ -52,12 +57,14 @@ export interface AiUsage {
 
 /** Raw text + usage a provider adapter returns before handoff parsing. */
 export interface ProviderResult {
+  assessment?: AiAssessment | null
   text: string
   usage: AiUsage | null
 }
 
 /** Outcome of a generation call. */
 export interface GenerateResult {
+  assessment?: AiAssessment | null
   /** The reply text, with any handoff sentinel stripped. */
   text: string
   /** True when the model asked to hand off to a human (auto-reply mode). */

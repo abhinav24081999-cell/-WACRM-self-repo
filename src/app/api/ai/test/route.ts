@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { decrypt } from '@/lib/whatsapp/encryption'
+import { listGeminiModels } from '@/lib/ai/providers/gemini'
 import { validateAiCredentials } from '@/lib/ai/validate'
 import { AiError, type AiProvider } from '@/lib/ai/types'
+import { normalizeN8nUrl, N8N_MODEL } from '@/lib/ai/providers/n8n'
 import { normalizeOpenAiCompatibleBaseUrl } from '@/lib/ai/providers/openai-compatible'
 import { canReuseStoredAiKey } from '@/lib/ai/stored-key'
 import { getT } from '@/lib/i18n/translate'
@@ -32,14 +34,15 @@ export async function POST(request: Request) {
     }
 
     const provider = body.provider as AiProvider
-    if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'openai_compatible') {
+    if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'gemini' && provider !== 'n8n' && provider !== 'openai_compatible') {
       return NextResponse.json(
         { error: t('ai.providerInvalid') },
         { status: 400 },
       )
     }
-    const model = typeof body.model === 'string' ? body.model.trim() : ''
-    if (!model) {
+    const model = provider === 'n8n' ? N8N_MODEL : typeof body.model === 'string' ? body.model.trim() : ''
+    const discover = provider === 'gemini' && body.discover_models === true
+    if (!model && !discover) {
       return NextResponse.json({ error: t('ai.modelRequired') }, { status: 400 })
     }
     const baseUrlProvided = 'base_url' in body
@@ -57,15 +60,16 @@ export async function POST(request: Request) {
       existing = data as unknown as { api_key: string; provider: AiProvider; base_url: string | null } | null
     }
     let baseUrl: string | null = null
-    if (provider === 'openai_compatible') {
+    if (provider === 'n8n' || provider === 'openai_compatible') {
       const candidate = baseUrlProvided
         ? requestedBaseUrl
-        : existing?.provider === 'openai_compatible'
+        : existing?.provider === provider
           ? (existing.base_url ?? '').trim()
           : ''
       if (!candidate) return NextResponse.json({ error: t('ai.baseUrlRequired'), code: 'invalid_base_url' }, { status: 400 })
       try {
-        normalizeOpenAiCompatibleBaseUrl(candidate)
+        if (provider === 'n8n') normalizeN8nUrl(candidate)
+        else normalizeOpenAiCompatibleBaseUrl(candidate)
       } catch (err) {
         return NextResponse.json({ error: err instanceof AiError ? err.message : t('ai.baseUrlInvalid'), code: 'invalid_base_url' }, { status: 400 })
       }
@@ -90,6 +94,7 @@ export async function POST(request: Request) {
     }
 
     try {
+      if (discover) return NextResponse.json({ models: await listGeminiModels(apiKeyPlain) })
       await validateAiCredentials({
         provider,
         model,
