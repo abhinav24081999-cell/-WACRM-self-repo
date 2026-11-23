@@ -27,7 +27,7 @@ const empty: Omit<Plan, 'id'> = {
   yearly_price_paise: 0,
   max_contacts: null,
   max_team: null,
-  max_whatsapp: null,
+  max_whatsapp: 1,
   features: [...PLAN_FEATURES],
   archived_at: null,
 };
@@ -163,7 +163,8 @@ export function PlanCatalog({
                   <div key={key} className="flex justify-between gap-3">
                     <dt className="text-muted-foreground">{t(key)}</dt>
                     <dd className="font-medium tabular-nums">
-                      {plan[key] ?? t('unlimited')}
+                      {plan[key] ??
+                        (key === 'max_whatsapp' ? 1 : t('unlimited'))}
                     </dd>
                   </div>
                 ))}
@@ -287,8 +288,10 @@ export function PlanCatalog({
                         name={key}
                         type="number"
                         min="0"
-                        max="2147483647"
-                        placeholder={t('unlimited')}
+                        max={key === 'max_whatsapp' ? 1 : 2147483647}
+                        placeholder={
+                          key === 'max_whatsapp' ? '1' : t('unlimited')
+                        }
                         defaultValue={draft[key] ?? ''}
                         className="h-11"
                       />

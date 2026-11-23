@@ -2476,7 +2476,7 @@
     "duplicate": "Duplicar",
     "noPlans": "Ainda não há planos. Crie um para atribuí-lo a um espaço.",
     "noExtras": "Apenas CRM básico",
-    "editHelp": "Deixe o limite vazio para uso ilimitado. Os preços são referências para cobrança manual.",
+    "editHelp": "Deixe o limite vazio para uso ilimitado. Os preços são referências para cobrança manual. Cada espaço aceita um número de WhatsApp.",
     "name": "Nome do plano",
     "features": "Recursos incluídos",
     "ai": "Agentes de IA",

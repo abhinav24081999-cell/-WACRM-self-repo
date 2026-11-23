@@ -45,6 +45,7 @@ platform administrator assigns a plan. Lower limits prevent additional
 contacts, admin or agent seats, and WhatsApp configurations. Existing
 records remain accessible. Archived plans continue to apply to current
 customers.
+The current messaging schema supports one WhatsApp number per workspace.
 
 Workspace owners can adjust Admin and Agent permissions in Settings →
 Members. Admins and owners can create staff logins in their workspace.

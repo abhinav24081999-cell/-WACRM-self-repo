@@ -36,10 +36,11 @@ it('preserves access before migration and propagates unrelated database errors',
 });
 
 it('validates stored plan limits and enumerated plan features', () => {
-  const limits = { max_contacts: 0, max_team: null, max_whatsapp: 2 };
+  const limits = { max_contacts: 0, max_team: null, max_whatsapp: 1 };
   expect(planLimits(limits)).toEqual(limits);
   expect(planLimits({ ...limits, max_team: -1 })).toBeNull();
   expect(planLimits({ ...limits, max_whatsapp: 1.5 })).toBeNull();
+  expect(planLimits({ ...limits, max_whatsapp: 2 })).toBeNull();
   expect(choices(['ai', 'ai'], PLAN_FEATURES)).toEqual(['ai']);
   expect(choices(['untracked_feature'], PLAN_FEATURES)).toBeNull();
 });

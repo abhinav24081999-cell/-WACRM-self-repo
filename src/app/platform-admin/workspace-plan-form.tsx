@@ -120,9 +120,11 @@ export function WorkspacePlanForm({
                     name={key}
                     type="number"
                     min="0"
-                    max="2147483647"
+                    max={key === 'max_whatsapp' ? 1 : 2147483647}
                     defaultValue={current?.[key] ?? ''}
-                    placeholder={String(plan[key] ?? t('unlimited'))}
+                    placeholder={String(
+                      plan[key] ?? (key === 'max_whatsapp' ? 1 : t('unlimited'))
+                    )}
                     className="h-10"
                   />
                 </div>

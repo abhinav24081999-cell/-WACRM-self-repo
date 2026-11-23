@@ -56,7 +56,11 @@ export function planLimits(value: Record<string, unknown>): PlanLimits | null {
       Number.isInteger(limit) &&
       limit >= 0 &&
       limit <= 2_147_483_647);
-  if (!valid(max_contacts) || !valid(max_team) || !valid(max_whatsapp))
+  if (
+    !valid(max_contacts) ||
+    !valid(max_team) ||
+    (max_whatsapp !== null && max_whatsapp !== 0 && max_whatsapp !== 1)
+  )
     return null;
   return { max_contacts, max_team, max_whatsapp } as PlanLimits;
 }

@@ -2476,7 +2476,7 @@
     "duplicate": "Duplicate",
     "noPlans": "No plans yet. Create a plan to assign it to a workspace.",
     "noExtras": "Core CRM only",
-    "editHelp": "Leave a limit blank for unlimited usage. Prices are reference amounts for manual billing.",
+    "editHelp": "Leave a limit blank for unlimited usage. Prices are reference amounts for manual billing. Each workspace supports one WhatsApp number.",
     "name": "Plan name",
     "features": "Included features",
     "ai": "AI agents",

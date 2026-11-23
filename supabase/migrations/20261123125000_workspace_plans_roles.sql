@@ -5,7 +5,7 @@ CREATE TABLE public.platform_plans (
   yearly_price_paise integer NOT NULL CHECK (yearly_price_paise >= 0),
   max_contacts integer CHECK (max_contacts >= 0),
   max_team integer CHECK (max_team >= 0),
-  max_whatsapp integer CHECK (max_whatsapp >= 0),
+  max_whatsapp integer CHECK (max_whatsapp BETWEEN 0 AND 1),
   features text[] NOT NULL CHECK (features <@ ARRAY['ai','automation','campaigns','api','webhooks','capi']),
   archived_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -18,7 +18,7 @@ CREATE TABLE public.workspace_plan_settings (
   plan_id uuid NOT NULL REFERENCES public.platform_plans(id),
   max_contacts integer CHECK (max_contacts >= 0),
   max_team integer CHECK (max_team >= 0),
-  max_whatsapp integer CHECK (max_whatsapp >= 0),
+  max_whatsapp integer CHECK (max_whatsapp BETWEEN 0 AND 1),
   features text[] CHECK (features <@ ARRAY['ai','automation','campaigns','api','webhooks','capi'])
 );
 CREATE INDEX workspace_plan_settings_plan_idx ON public.workspace_plan_settings(plan_id);
