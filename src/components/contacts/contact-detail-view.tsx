@@ -450,7 +450,7 @@ export function ContactDetailView({
             </div>
           ) : (
             <>
-              <SheetHeader className="border-border shrink-0 gap-3 border-b px-4 py-4">
+              <SheetHeader className="border-border shrink-0 gap-2.5 border-b px-4 py-3">
                 <div className="flex items-start gap-3 pr-8">
                   <Avatar className="border-primary/20 size-12 shrink-0 border">
                     <AvatarFallback className="bg-primary-soft-2 text-foreground text-sm font-semibold">
@@ -791,7 +791,7 @@ export function ContactDetailView({
                 </Accordion>
               </div>
 
-              <SheetFooter className="border-border shrink-0 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <SheetFooter className="border-border shrink-0 border-t px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
                 <Button
                   type="submit"
                   form={detailsFormId}
