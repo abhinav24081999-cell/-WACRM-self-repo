@@ -67,3 +67,27 @@ it("never reads the outbox for unauthorized IDs or sessions", async () => {
   expect((await POST(request([id]))).status).toBe(401);
   expect(admin).not.toHaveBeenCalled();
 });
+
+it("shows a saved Meta Instant Form conversion for a contact within the authorized workspace", async () => {
+  const lookup = query([{id}]);
+  const formLead = {
+    contact_id: id, source: "meta_instant_form", meta_event_key: "meta_instant_form:1234",
+    status: "converted", attribution: null, lead_status_history: [],
+  };
+  const outbox = query([
+    {...formLead, conversion_feedback_events: []},
+    {...formLead, conversion_feedback_events: [{
+      id: "event", state: "accepted", stage: "converted", source: "meta_instant_form", test_mode: false,
+      reason: null, event_time: "2026-11-23T11:00:00Z", sent_at: null, attempts: 1, destination: "Converted",
+    }]},
+  ]);
+  conversations.mockReturnValue(lookup);
+  leads.mockReturnValue(outbox);
+  const response = await POST(request({contactIds: [id, foreign]}));
+  const body = await response.json();
+  expect(lookup.eq).toHaveBeenCalledWith("account_id", "workspace");
+  expect(outbox.in).toHaveBeenCalledWith("contact_id", [id]);
+  expect(outbox.in).toHaveBeenCalledWith("source", ["whatsapp", "instagram_dm", "messenger", "meta_instant_form"]);
+  expect(Object.keys(body)).toEqual([id]);
+  expect(body[id].capi).toMatchObject({source: "meta_instant_form", latest: {status: "accepted", test: false}});
+});

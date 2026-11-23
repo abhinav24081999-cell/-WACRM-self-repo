@@ -333,6 +333,7 @@
       "whatsappNotConnected": "WhatsApp® no está conectado. Ve a Configuración para conectar tu cuenta."
     },
     "conversationLabels": {
+      "metaStatus": "Estado de Meta",
       "tags": "Etiquetas del contacto",
       "viewTags": "Ver {count} etiquetas del contacto",
       "conversionStatus": "Estado de la API de conversiones",
@@ -344,7 +345,7 @@
       "sentAt": "Enviado {date}",
       "status": {
         "accepted": "Aceptado",
-        "pending": "En cola",
+        "pending": "Pendiente",
         "sending": "Enviando",
         "failed": "Fallido",
         "retrying": "Reintentando",

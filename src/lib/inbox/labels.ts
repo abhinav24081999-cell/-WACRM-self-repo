@@ -5,7 +5,8 @@ export const META_INBOX_SOURCES = ["whatsapp", "instagram_dm", "messenger"] as c
 
 export type InboxTag = Pick<Tag, "id" | "name" | "color">;
 export type CapiStatus = "accepted" | "pending" | "sending" | "failed" | "retrying" | "skipped" | "tested" | "needs_review" | "not_sent";
-export type CapiStage = "new" | "qualified";
+export type CapiStage = "new" | "qualified" | "converted";
+const stageRank = { new: 0, qualified: 1, converted: 2 };
 export type CapiLabel = { status: CapiStatus; test: boolean };
 export type CapiEventLabel = CapiLabel & {
   stage: CapiStage;
@@ -15,7 +16,7 @@ export type CapiEventLabel = CapiLabel & {
   attempts: number;
   issue?: "credentials" | "identifiers" | "uncertain" | "delivery";
 };
-export type InboxLabels = Record<string, { tags: InboxTag[]; capi?: { latest: CapiLabel; events: CapiEventLabel[] } }>;
+export type InboxLabels = Record<string, { tags: InboxTag[]; capi?: { latest: CapiLabel; events: CapiEventLabel[]; source?: string } }>;
 
 export type InboxThreadIdentity = {
   id: string;
@@ -48,7 +49,7 @@ export type InboxMetaLead = {
   conversion_feedback_events: StoredCapiEvent[];
 };
 
-export type InboxMetaRule = { test_mode: boolean; messagingAccount: string };
+export type InboxMetaRule = { test_mode: boolean; messagingAccount?: string };
 
 export function inboxLeadKey(lead: InboxMetaLead) {
   const [source, account, sender] = lead.meta_event_key.split(":", 3);
@@ -76,21 +77,23 @@ function issueFor(event: StoredCapiEvent): CapiEventLabel["issue"] {
 export function inboxCapiLabel(lead: InboxMetaLead, rule: InboxMetaRule | undefined, showDiagnostics: boolean): InboxLabels[string]["capi"] {
   const events = lead.conversion_feedback_events
     .filter(event => event.source === lead.source &&
-      (event.stage === "new" || event.stage === "qualified") &&
+      Object.hasOwn(stageRank, event.stage) &&
       ["accepted", "pending", "sending", "failed", "retrying", "skipped", "tested", "needs_review"].includes(event.state))
-    .sort((a, b) => Number(b.stage === "qualified") - Number(a.stage === "qualified") ||
+    .sort((a, b) => stageRank[b.stage] - stageRank[a.stage] ||
       Number(a.test_mode) - Number(b.test_mode) || b.event_time.localeCompare(a.event_time) || b.id.localeCompare(a.id));
   const newest = events[0];
   const ids = lead.attribution;
   const attributable = lead.source === "whatsapp"
     ? typeof ids?.ctwa_clid === "string" && lead.meta_event_key === "whatsapp:click:" + ids.ctwa_clid &&
       ids.whatsapp_business_account_id === rule?.messagingAccount
-    : lead.meta_event_key.split(":", 3)[1] === rule?.messagingAccount;
+    : lead.source === "meta_instant_form"
+      ? /^meta_instant_form:\d{1,40}$/.test(lead.meta_event_key)
+      : Boolean(rule?.messagingAccount) && lead.meta_event_key.split(":", 3)[1] === rule?.messagingAccount;
 
   // Opening a thread is not a submitted lead. Only label a reached qualification as unsent.
   const qualificationUnsent = rule && attributable &&
     (lead.status === "qualified" || lead.lead_status_history.some(entry => entry.status === "qualified")) &&
-    !(newest?.stage === "qualified" && !newest.test_mode) &&
+    newest?.stage !== "converted" && !(newest?.stage === "qualified" && !newest.test_mode) &&
     !events.some(event => event.stage === "qualified" && event.test_mode === rule.test_mode);
 
   const latest: CapiLabel | undefined = qualificationUnsent

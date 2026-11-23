@@ -333,6 +333,7 @@
       "whatsappNotConnected": "WhatsApp®이 연결되어 있지 않습니다. 설정으로 이동해 계정을 연결하세요."
     },
     "conversationLabels": {
+      "metaStatus": "Meta 상태",
       "tags": "연락처 태그",
       "viewTags": "연락처 태그 {count}개 보기",
       "conversionStatus": "전환 API 상태",
