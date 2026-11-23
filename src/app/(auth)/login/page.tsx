@@ -106,12 +106,12 @@ function LoginPageInner() {
         <CardContent>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             {linkErrorMessage && !error && (
-              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+              <div role="alert" className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
                 {linkErrorMessage}
               </div>
             )}
             {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              <div role="alert" className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-foreground">
                 {error}
               </div>
             )}
@@ -123,6 +123,7 @@ function LoginPageInner() {
               <Input
                 id="email"
                 type="email"
+                autoComplete="username"
                 placeholder={t('emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -138,6 +139,7 @@ function LoginPageInner() {
               <Input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 placeholder={t('passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -156,24 +158,14 @@ function LoginPageInner() {
             <Button
               type="submit"
               disabled={loading}
-              className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="mt-2 h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {loading ? t('signingIn') : t('signIn')}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            {t('noAccount')}{" "}
-            <Link
-              href={
-                inviteToken
-                  ? `/signup?invite=${encodeURIComponent(inviteToken)}`
-                  : "/signup"
-              }
-              className="text-primary hover:text-primary/80"
-            >
-              {t('createAccount')}
-            </Link>
+            {t('accessHelp')}
           </p>
         </CardContent>
       </Card>
