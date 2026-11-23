@@ -12,6 +12,9 @@
 -- build the schema", not a spec of it — asserting every column here
 -- would just be the migrations restated in a second place, drifting.
 DO $$
+DECLARE
+  v_customer uuid := gen_random_uuid();
+  v_actor uuid := gen_random_uuid();
 BEGIN
   -- The core tables, from 001.
   IF to_regclass('public.messages') IS NULL THEN
@@ -171,6 +174,32 @@ BEGIN
     OR has_column_privilege('authenticated', 'public.conversion_feedback_events', 'identifiers', 'SELECT') THEN
     RAISE EXCEPTION 'conversion feedback or ads reporting grants are too broad';
   END IF;
+
+  IF has_table_privilege('authenticated', 'public.platform_user_provisioning_log', 'SELECT') THEN
+    RAISE EXCEPTION 'The platform provisioning audit log is readable by ordinary users';
+  END IF;
+
+  BEGIN
+    -- Auth inserts the user before applying custom app metadata.
+    INSERT INTO auth.users (id, email, raw_user_meta_data)
+    VALUES (v_customer, 'phase1-check@example.test', '{"full_name":"Phase 1 check"}');
+    UPDATE auth.users
+    SET raw_app_meta_data = jsonb_build_object('wacrm_provisioned_by', v_actor)
+    WHERE id = v_customer;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.platform_user_provisioning_log log
+      JOIN public.accounts a ON a.id = log.account_id
+      WHERE log.user_id = v_customer AND log.actor_user_id = v_actor AND a.owner_user_id = v_customer
+    ) THEN
+      RAISE EXCEPTION 'Platform provisioning did not record the actor and owned workspace';
+    END IF;
+
+    RAISE SQLSTATE 'P1010';
+  EXCEPTION WHEN SQLSTATE 'P1010' THEN
+    NULL;
+  END;
 
   RAISE NOTICE 'schema verification passed';
 END

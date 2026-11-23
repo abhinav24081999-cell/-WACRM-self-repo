@@ -11,15 +11,13 @@
 //   │ peek                 │ auth          │ render                   │
 //   ├──────────────────────┼───────────────┼─────────────────────────┤
 //   │ loading              │ —             │ spinner                  │
-//   │ ok:false (any reason)│ —             │ friendly error + signup  │
-//   │ ok:true              │ signed out    │ "Sign up" + "Sign in"    │
+//   │ ok:false (any reason)│ —             │ friendly error + sign in │
+//   │ ok:true              │ signed out    │ "Sign in"                │
 //   │ ok:true              │ signed in     │ "Accept" button → redeem │
 //   └──────────────────────┴───────────────┴─────────────────────────┘
 //
 // We deliberately do NOT redeem automatically on page load — the
 // invitee should confirm what account/role they're accepting.
-// Auto-redeem would also race with the signup flow returning to
-// this page after email verification.
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react';
@@ -85,7 +83,7 @@ export default function JoinPage() {
   const [peek, setPeek] = useState<PeekResult | null>(null);
   // Local auth probe — the AuthProvider lives inside the (dashboard)
   // route group, so it doesn't reach this page. We hit Supabase
-  // directly the same way `/login` and `/signup` do.
+  // directly the same way `/login` does.
   const [authedUserId, setAuthedUserId] = useState<string | null | undefined>(
     undefined, // undefined = unknown / still loading; null = signed out
   );
@@ -237,47 +235,14 @@ export default function JoinPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
-          {/* For server_error the failure is transient — the network
-              flapped or the peek endpoint hiccupped. Try-again is
-              the right primary action; the "create account" /
-              "sign in" links stay as secondary options. Other
-              failure reasons (not_found / used / expired) are
-              terminal for this token, so no retry — just the
-              signup/sign-in escape hatches. */}
-          {RETRYABLE_PEEK_FAIL_REASONS.has(peek.reason) ? (
-            <>
-              <Button
-                onClick={loadPeekAndAuth}
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {t('tryAgain')}
-              </Button>
-              <Link href="/signup">
-                <Button
-                  variant="outline"
-                  className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  {t('createNewAccount')}
-                </Button>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/signup">
-                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                  {t('createNewAccount')}
-                </Button>
-              </Link>
-              <Link href="/login">
-                <Button
-                  variant="outline"
-                  className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  {t('signIn')}
-                </Button>
-              </Link>
-            </>
+          {RETRYABLE_PEEK_FAIL_REASONS.has(peek.reason) && (
+            <Button onClick={loadPeekAndAuth} className="h-11 w-full">
+              {t('tryAgain')}
+            </Button>
           )}
+          <Button render={<Link href="/login" />} nativeButton={false} variant="outline" className="h-11 w-full">
+            {t('signIn')}
+          </Button>
         </CardContent>
       </Card>
     );
@@ -403,24 +368,19 @@ export default function JoinPage() {
     );
   }
 
-  // ----- Not authed: prompt to sign up or sign in -----
+  // ----- Not authed: sign in to accept -----
   return (
     <Card className="w-full max-w-md border-border bg-card">
       {inviteHeader}
       <CardContent className="flex flex-col gap-2">
-        <Link href={`/signup?invite=${encodeURIComponent(token!)}`}>
-          <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-            {t('createAndJoin')}
-          </Button>
-        </Link>
-        <Link href={`/login?invite=${encodeURIComponent(token!)}`}>
-          <Button
-            variant="outline"
-            className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            {t('haveAccount')}
-          </Button>
-        </Link>
+        <Button
+          render={<Link href={`/login?invite=${encodeURIComponent(token!)}`} />}
+          nativeButton={false}
+          className="h-11 w-full"
+        >
+          {t('signIn')}
+        </Button>
+        <p className="text-center text-sm text-muted-foreground">{t('accessHelp')}</p>
       </CardContent>
     </Card>
   );

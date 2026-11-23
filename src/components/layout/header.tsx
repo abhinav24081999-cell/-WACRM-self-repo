@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, Settings as SettingsIcon, User } from "lucide-react";
+import { LogOut, Menu, Settings as SettingsIcon, ShieldCheck, User } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Avatar,
   AvatarFallback,
@@ -41,12 +43,14 @@ interface HeaderProps {
   /** Wired to the shell's drawer state. Used only on mobile — the
    *  hamburger button is hidden on lg+. */
   onOpenSidebar?: () => void;
+  showPlatformAdmin: boolean;
 }
 
 import { useTranslations } from "next-intl";
 
-export function Header({ onOpenSidebar }: HeaderProps) {
+export function Header({ onOpenSidebar, showPlatformAdmin }: HeaderProps) {
   const t = useTranslations("Header");
+  const tPlatform = useTranslations("PlatformAccess");
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const titleKey = getPageTitleKey(pathname);
@@ -74,6 +78,15 @@ export function Header({ onOpenSidebar }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2">
+        {showPlatformAdmin && (
+          <Link
+            href="/platform-admin"
+            className={cn(buttonVariants({ variant: "outline" }), "h-11 sm:h-9")}
+          >
+            <ShieldCheck aria-hidden="true" />
+            {tPlatform("admin")}
+          </Link>
+        )}
         <ModeToggle />
 
         <DropdownMenu>

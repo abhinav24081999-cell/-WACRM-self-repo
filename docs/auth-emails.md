@@ -1,10 +1,33 @@
-# Auth emails: confirmation and password-reset links
+# WACRM access and auth emails
 
-wacrm uses Supabase Auth for sign-up, sign-in and password reset. Two
-of those flows send an email with a link, and the link has to come back
-to **your** deployment. This page explains how the app asks for that,
-what Supabase needs to be told for it to comply, and what the symptoms
-look like when it isn't.
+WACRM uses Supabase Auth for sign-in and password reset. The platform
+administrator creates customer logins. Team invitations can be accepted
+after signing in with an existing or newly provisioned login.
+
+## Releasing secure access
+
+1. Confirm the existing platform administrator's Supabase Auth user ID and
+   set `WACRM_PLATFORM_ADMIN_USER_ID` in Vercel's Production environment.
+   Set a separate branch-scoped value when reviewing a Preview. Account
+   creation on Vercel is restricted to Production.
+2. Apply `20261123123000_platform_secure_access.sql` to the Supabase
+   project connected to Production. Customer creation and its audit
+   record use the same database transaction.
+3. In the hosted Supabase project's **Authentication → General
+   Configuration**, turn off **Allow new users to sign up** and
+   **Allow anonymous sign-ins**. The local CLI config sets these flags
+   for local development. The hosted settings must be set separately.
+4. Release the application. Verify the existing administrator's sign-in
+   and Admin button, password resets, and the hosted Auth settings.
+   The Admin form creates a login with an initial password. Verify the
+   recipient's email before creating the login and share the password
+   privately. Ask the customer to change it in their profile.
+
+The Admin button requires a matching Supabase user ID. Unsetting
+`WACRM_PLATFORM_ADMIN_USER_ID` and redeploying disables that entry point
+and the provisioning API. The hosted signup setting is independent of
+the Vercel deployment and stays in effect if the application is rolled
+back.
 
 ## What the app does
 
@@ -14,7 +37,6 @@ forwards to the page the flow needs:
 
 | Flow | Started from | Link returns to |
 |---|---|---|
-| Email confirmation after sign-up | `/signup` | `/auth/callback?next=/dashboard` (or `/join/<token>` when signing up from an invite) |
 | Password reset | `/forgot-password` | `/auth/callback?next=/reset-password` |
 
 "The app's own origin" is the origin the browser loaded the page from
@@ -73,12 +95,11 @@ the symptom in [issue #595](https://github.com/ArnasDon/wacrm/issues/595).
 
 ### Local Supabase CLI (`supabase start`)
 
-`supabase/config.toml` in this repo exists only for the migration CI
-job and deliberately carries no `[auth]` section. If you run the local
-stack, add:
+`supabase/config.toml` already closes public signup and anonymous access.
+To configure email redirects in the local stack, add these keys to the
+existing `[auth]` section:
 
 ```toml
-[auth]
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/**"]
 ```

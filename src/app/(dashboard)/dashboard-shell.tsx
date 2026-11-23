@@ -14,7 +14,12 @@ import { BrowserNotificationsListener } from "@/components/notifications/browser
 // itself can stay a server component and export metadata (noindex) —
 // client components can't export Next's metadata object.
 
-function DashboardShellInner({ children }: { children: React.ReactNode }) {
+type DashboardShellProps = {
+  children: React.ReactNode;
+  showPlatformAdmin: boolean;
+};
+
+function DashboardShellInner({ children, showPlatformAdmin }: DashboardShellProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const t = useTranslations("DashboardShell");
@@ -53,7 +58,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       <BrowserNotificationsListener />
       <Sidebar open={sidebarOpen} onClose={closeSidebar} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header onOpenSidebar={() => setSidebarOpen(true)} />
+        <Header onOpenSidebar={() => setSidebarOpen(true)} showPlatformAdmin={showPlatformAdmin} />
         {/* Thinner horizontal padding on mobile so cards have room to breathe. */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Above every page: writes are being rejected and here's why.
@@ -66,10 +71,10 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell(props: DashboardShellProps) {
   return (
     <AuthProvider>
-      <DashboardShellInner>{children}</DashboardShellInner>
+      <DashboardShellInner {...props} />
     </AuthProvider>
   );
 }

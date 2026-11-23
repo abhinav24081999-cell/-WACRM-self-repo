@@ -100,6 +100,20 @@ describe("middleware — refreshed auth cookies survive redirects", () => {
     expect(res.cookies.get(ROTATED.name)?.value).toBe(ROTATED.value);
   });
 
+  it("sends an old registration link to sign-in and preserves the team invite", async () => {
+    const res = await middleware(
+      new NextRequest("https://app.test/signup?invite=abc123"),
+    );
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("https://app.test/login?invite=abc123");
+  });
+
+  it("requires sign-in before opening the platform admin page", async () => {
+    const res = await middleware(new NextRequest("https://app.test/platform-admin"));
+    expect(res.headers.get("location")).toBe("https://app.test/login");
+  });
+
   it("passes through (no redirect) for a signed-in user on a protected page", async () => {
     mockUser = { id: "user-1" };
     refreshedCookies = [ROTATED];

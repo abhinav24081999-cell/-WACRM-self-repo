@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getPlatformAdmin } from "@/lib/auth/platform-admin";
 import { DashboardShell } from "./dashboard-shell";
 
 // Server layout whose only job is to declare "do not index" metadata
@@ -19,10 +20,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardShell>{children}</DashboardShell>;
+  const showPlatformAdmin = Boolean(await getPlatformAdmin());
+  return <DashboardShell showPlatformAdmin={showPlatformAdmin}>{children}</DashboardShell>;
 }
