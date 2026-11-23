@@ -7,13 +7,13 @@ import type { CapiLabel, CapiStatus, InboxLabels, InboxTag } from "@/lib/inbox/l
 import { cn } from "@/lib/utils";
 
 const statusStyle = {
-  accepted: { icon: CircleCheck, color: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200" },
-  pending: { icon: Clock, color: "bg-amber-500/15 text-amber-900 dark:text-amber-200" },
-  retrying: { icon: Clock, color: "bg-amber-500/15 text-amber-900 dark:text-amber-200" },
-  sending: { icon: LoaderCircle, color: "bg-sky-500/15 text-sky-900 dark:text-sky-200" },
-  failed: { icon: TriangleAlert, color: "bg-destructive/10 text-destructive" },
-  needs_review: { icon: TriangleAlert, color: "bg-amber-500/15 text-amber-900 dark:text-amber-200" },
-  tested: { icon: FlaskConical, color: "bg-sky-500/15 text-sky-900 dark:text-sky-200" },
+  accepted: { icon: CircleCheck, color: "bg-emerald-500/15 text-foreground" },
+  pending: { icon: Clock, color: "bg-amber-500/15 text-foreground" },
+  retrying: { icon: Clock, color: "bg-amber-500/15 text-foreground" },
+  sending: { icon: LoaderCircle, color: "bg-sky-500/15 text-foreground" },
+  failed: { icon: TriangleAlert, color: "bg-destructive/15 text-foreground" },
+  needs_review: { icon: TriangleAlert, color: "bg-amber-500/15 text-foreground" },
+  tested: { icon: FlaskConical, color: "bg-sky-500/15 text-foreground" },
   skipped: { icon: Circle, color: "bg-muted text-muted-foreground" },
   not_sent: { icon: Circle, color: "bg-muted text-muted-foreground" },
 } satisfies Record<CapiStatus, { icon: typeof Circle; color: string }>;
