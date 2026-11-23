@@ -1,13 +1,18 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useId, type ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { addContactTag, deleteContactTag } from '@/lib/contacts/tag-api';
 import { ContactLeads } from '@/components/contacts/contact-leads';
 import { useAuth } from '@/hooks/use-auth';
-import { formatCurrency } from '@/lib/currency';
 import { toast } from 'sonner';
-import type { Contact, Tag, ContactTag, ContactNote, CustomField, ContactCustomValue, Deal, MessageTemplate } from '@/types';
+import type {
+  Contact,
+  Tag,
+  ContactNote,
+  CustomField,
+  MessageTemplate,
+} from '@/types';
 import {
   TemplatePicker,
   type TemplateSendValues,
@@ -15,31 +20,37 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Phone,
-  Mail,
-  Building2,
   Copy,
   Check,
+  ContactRound,
+  LayoutGrid,
+  LayoutTemplate,
   Loader2,
   Plus,
+  StickyNote,
+  Tag as TagIcon,
   Trash2,
+  TrendingUp,
   Save,
-  X,
-  DollarSign,
-  LayoutTemplate,
+  type LucideIcon,
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { planCustomValueWrites } from '@/lib/contacts/custom-value-writes';
@@ -53,6 +64,38 @@ interface ContactDetailViewProps {
   onUpdated: () => void;
 }
 
+function ContactSection({
+  value,
+  title,
+  icon: Icon,
+  keepMounted,
+  children,
+}: {
+  value: string;
+  title: string;
+  icon: LucideIcon;
+  keepMounted?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <AccordionItem
+      value={value}
+      className="border-border bg-card-2 rounded-xl border"
+    >
+      <AccordionTrigger className="hover:bg-muted/50 min-h-11 items-center justify-start gap-3 px-3 py-2 text-[0.9375rem] hover:no-underline">
+        <Icon
+          aria-hidden="true"
+          className="text-muted-foreground size-4 shrink-0"
+        />
+        {title}
+      </AccordionTrigger>
+      <AccordionContent keepMounted={keepMounted} className="px-3 pb-3">
+        {children}
+      </AccordionContent>
+    </AccordionItem>
+  );
+}
+
 export function ContactDetailView({
   open,
   onOpenChange,
@@ -60,9 +103,11 @@ export function ContactDetailView({
   onUpdated,
 }: ContactDetailViewProps) {
   const t = useTranslations('Contacts.detailView');
+  const clipboardText = useTranslations('Inbox.actions');
   const locale = useLocale();
+  const detailsFormId = useId();
   const supabase = createClient();
-  const { accountId, defaultCurrency } = useAuth();
+  const { accountId } = useAuth();
 
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(false);
@@ -74,33 +119,29 @@ export function ContactDetailView({
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [sendingTemplate, setSendingTemplate] = useState(false);
 
-  // Details tab
+  // Details
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editCompany, setEditCompany] = useState('');
   const [savingDetails, setSavingDetails] = useState(false);
 
-  // Tags tab
+  // Tags
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [contactTagIds, setContactTagIds] = useState<string[]>([]);
   const [savingTags, setSavingTags] = useState(false);
 
-  // Notes tab
+  // Notes
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [newNote, setNewNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [loadingNotes, setLoadingNotes] = useState(false);
 
-  // Custom fields tab
+  // Custom fields
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
   const [savingCustom, setSavingCustom] = useState(false);
   const [loadingCustom, setLoadingCustom] = useState(false);
-
-  // Deals tab
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [loadingDeals, setLoadingDeals] = useState(false);
 
   const fetchContact = useCallback(async () => {
     if (!contactId) return;
@@ -127,7 +168,10 @@ export function ContactDetailView({
 
     const [tagsRes, contactTagsRes] = await Promise.all([
       supabase.from('tags').select('*').order('name'),
-      supabase.from('contact_tags').select('tag_id').eq('contact_id', contactId),
+      supabase
+        .from('contact_tags')
+        .select('tag_id')
+        .eq('contact_id', contactId),
     ]);
 
     if (tagsRes.data) setAllTags(tagsRes.data);
@@ -173,33 +217,24 @@ export function ContactDetailView({
     setLoadingCustom(false);
   }, [contactId, supabase]);
 
-  const fetchDeals = useCallback(async () => {
-    if (!contactId) return;
-    setLoadingDeals(true);
-    const { data } = await supabase
-      .from('deals')
-      .select('*, stage:pipeline_stages(*)')
-      .eq('contact_id', contactId)
-      .order('created_at', { ascending: false });
-    setDeals((data ?? []) as Deal[]);
-    setLoadingDeals(false);
-  }, [contactId, supabase]);
-
   useEffect(() => {
     if (open && contactId) {
       fetchContact();
       fetchTags();
       fetchNotes();
       fetchCustomFields();
-      fetchDeals();
     }
-  }, [open, contactId, fetchContact, fetchTags, fetchNotes, fetchCustomFields, fetchDeals]);
+  }, [open, contactId, fetchContact, fetchTags, fetchNotes, fetchCustomFields]);
 
   async function copyPhone() {
     if (!contact) return;
-    await navigator.clipboard.writeText(contactHandle(contact));
-    setCopiedPhone(true);
-    setTimeout(() => setCopiedPhone(false), 2000);
+    try {
+      await navigator.clipboard.writeText(contactHandle(contact));
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 2000);
+    } catch {
+      toast.error(clipboardText('copyFailed'));
+    }
   }
 
   async function saveDetails() {
@@ -256,7 +291,9 @@ export function ContactDetailView({
       }
       onUpdated();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('toastUpdateFailed'));
+      toast.error(
+        error instanceof Error ? error.message : t('toastUpdateFailed')
+      );
     }
     setSavingTags(false);
   }
@@ -341,7 +378,7 @@ export function ContactDetailView({
 
   async function handleSendTemplate(
     template: MessageTemplate,
-    values: TemplateSendValues,
+    values: TemplateSendValues
   ) {
     if (!contactId) return;
     setSendingTemplate(true);
@@ -391,396 +428,393 @@ export function ContactDetailView({
       .slice(0, 2);
   }
 
+  const handle = contact ? contactHandle(contact) : '';
+  const contactName = contact?.name || handle || t('unnamed');
+
   return (
     <>
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="bg-popover border-border text-popover-foreground sm:max-w-lg w-full p-0"
-      >
-        {loading || !contact ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="size-6 animate-spin text-primary" />
-          </div>
-        ) : (
-          <div className="flex flex-col h-full">
-            {/* Header */}
-            <SheetHeader className="p-4 border-b border-border/50">
-              <div className="flex items-center gap-3">
-                <Avatar className="size-12 bg-muted border border-border">
-                  <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                    {getInitials(contact.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <SheetTitle className="text-popover-foreground truncate">
-                    {contact.name || t('unnamed')}
-                  </SheetTitle>
-                  <SheetDescription className="text-muted-foreground text-xs mt-0.5">
-                    {t('contactDetailsDesc')}
-                  </SheetDescription>
-                  <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                    <button
-                      onClick={copyPhone}
-                      className="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
-                    >
-                      <Phone className="size-3" />
-                      {contactHandle(contact)}
-                      {copiedPhone ? (
-                        <Check className="size-3 text-primary" />
-                      ) : (
-                        <Copy className="size-3" />
-                      )}
-                    </button>
-                    {contact.email && (
-                      <span className="flex items-center gap-1">
-                        <Mail className="size-3" />
-                        {contact.email}
-                      </span>
-                    )}
-                    {contact.company && (
-                      <span className="flex items-center gap-1">
-                        <Building2 className="size-3" />
-                        {contact.company}
-                      </span>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="border-border bg-sidebar gap-0 p-0 data-[side=right]:w-full motion-reduce:transition-none data-[side=right]:sm:max-w-[23rem]"
+        >
+          {loading || !contact || contact.id !== contactId ? (
+            <div className="flex flex-1 items-center justify-center">
+              <SheetTitle className="sr-only">
+                {t('contactDetailsDesc')}
+              </SheetTitle>
+              <Loader2
+                aria-hidden="true"
+                className="text-primary size-6 animate-spin"
+              />
+            </div>
+          ) : (
+            <>
+              <SheetHeader className="border-border shrink-0 gap-2.5 border-b px-4 py-3">
+                <div className="flex items-start gap-3 pr-8">
+                  <Avatar className="border-primary/20 size-12 shrink-0 border">
+                    <AvatarFallback className="bg-primary-soft-2 text-foreground text-sm font-semibold">
+                      {getInitials(contactName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 space-y-0.5">
+                    <SheetTitle className="text-lg leading-tight font-semibold [overflow-wrap:anywhere]">
+                      {contactName}
+                    </SheetTitle>
+                    <SheetDescription className="text-xs">
+                      {t('contactDetailsDesc')}
+                    </SheetDescription>
+                    {handle && (
+                      <button
+                        type="button"
+                        onClick={copyPhone}
+                        aria-label={`${clipboardText(copiedPhone ? 'copied' : 'copyText')}: ${handle}`}
+                        className="text-muted-foreground hover:text-foreground focus-visible:outline-ring flex min-h-6 max-w-full cursor-pointer items-center gap-1.5 rounded-sm text-left text-xs focus-visible:outline-2"
+                      >
+                        {contact.phone && (
+                          <Phone
+                            aria-hidden="true"
+                            className="size-3 shrink-0"
+                          />
+                        )}
+                        <span className="[overflow-wrap:anywhere]">
+                          {handle}
+                        </span>
+                        {copiedPhone ? (
+                          <Check
+                            aria-hidden="true"
+                            className="size-3 shrink-0"
+                          />
+                        ) : (
+                          <Copy
+                            aria-hidden="true"
+                            className="size-3 shrink-0"
+                          />
+                        )}
+                      </button>
                     )}
                   </div>
                 </div>
-              </div>
-              <div className="mt-3">
                 <Button
-                  size="sm"
                   onClick={() => setTemplatePickerOpen(true)}
                   disabled={sendingTemplate}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="hover:bg-primary-hover h-9 w-fit"
                 >
                   {sendingTemplate ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="animate-spin" />
                   ) : (
-                    <LayoutTemplate className="size-4" />
+                    <LayoutTemplate />
                   )}
                   {t('sendTemplateBtn')}
                 </Button>
-              </div>
-            </SheetHeader>
+              </SheetHeader>
 
-            {/* Tabs */}
-            <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
-              <TabsList className="bg-muted/50 border-b border-border mx-4 mt-3 max-w-[calc(100%-2rem)] justify-start overflow-x-auto">
-                <TabsTrigger
-                  value="details"
-                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-2.5">
+                <Accordion
+                  key={contact.id}
+                  defaultValue={['details']}
+                  multiple
+                  className="gap-1.5 motion-reduce:[&_[data-slot=accordion-content]]:animate-none"
                 >
-                  {t('tabs.details')}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="leads"
-                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
-                >
-                  {t('tabs.leads')}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="tags"
-                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
-                >
-                  {t('tabs.tags')}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="notes"
-                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
-                >
-                  {t('tabs.notes')}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="custom"
-                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
-                >
-                  {t('tabs.custom')}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="deals"
-                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
-                >
-                  {t('tabs.deals')}
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="leads" className="flex-1 overflow-y-auto px-4 py-3">
-                {accountId && contactId === contact.id && (
-                  <ContactLeads key={`${accountId}:${contact.id}`} accountId={accountId} contactId={contact.id} />
-                )}
-              </TabsContent>
-
-              {/* Details Tab */}
-              <TabsContent value="details" className="flex-1 overflow-y-auto px-4 py-3">
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">{t('name')}</Label>
-                    <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="bg-muted border-border text-foreground h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                      {t('phone')} <span className="text-red-400">*</span>
-                    </Label>
-                    <Input
-                      value={editPhone}
-                      onChange={(e) => setEditPhone(e.target.value)}
-                      className="bg-muted border-border text-foreground h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">{t('email')}</Label>
-                    <Input
-                      value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
-                      className="bg-muted border-border text-foreground h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">{t('company')}</Label>
-                    <Input
-                      value={editCompany}
-                      onChange={(e) => setEditCompany(e.target.value)}
-                      className="bg-muted border-border text-foreground h-8 text-sm"
-                    />
-                  </div>
-                  <Button
-                    onClick={saveDetails}
-                    disabled={savingDetails}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground w-full"
-                    size="sm"
+                  <ContactSection
+                    value="details"
+                    title={t('tabs.details')}
+                    icon={ContactRound}
+                    keepMounted
                   >
-                    {savingDetails ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Save className="size-3.5" />
-                    )}
-                    {t('saveChangesBtn')}
-                  </Button>
-                </div>
-              </TabsContent>
-
-              {/* Tags Tab */}
-              <TabsContent value="tags" className="flex-1 overflow-y-auto px-4 py-3">
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    {t('tagsTab.clickTagDesc')}
-                  </p>
-                  {allTags.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t('tagsTab.noTagsAvailable')}
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {allTags.map((tag) => {
-                        const selected = contactTagIds.includes(tag.id);
-                        return (
-                          <button
-                            key={tag.id}
-                            onClick={() => toggleTag(tag.id)}
-                            disabled={savingTags}
-                            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all cursor-pointer ${
-                              selected
-                                ? 'ring-2 ring-primary ring-offset-1 ring-offset-border'
-                                : 'opacity-50 hover:opacity-80'
-                            }`}
-                            style={{
-                              backgroundColor: tag.color + '20',
-                              color: tag.color,
-                            }}
-                          >
-                            {selected && <Check className="size-3 mr-1" />}
-                            {tag.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-
-              {/* Notes Tab */}
-              <TabsContent value="notes" className="flex-1 flex flex-col min-h-0 px-4 py-3">
-                <div className="space-y-2 mb-3">
-                  <Textarea
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    placeholder={t('notesTab.placeholder')}
-                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[60px] text-sm resize-none"
-                  />
-                  <Button
-                    onClick={addNote}
-                    disabled={!newNote.trim() || savingNote}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                    size="sm"
-                  >
-                    {savingNote ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Plus className="size-3.5" />
-                    )}
-                    {t('notesTab.save')}
-                  </Button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto space-y-2">
-                  {loadingNotes ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="size-5 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : notes.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      {t('notesTab.noNotes')}
-                    </p>
-                  ) : (
-                    notes.map((note) => (
-                      <div
-                        key={note.id}
-                        className="rounded-lg bg-muted/50 border border-border/50 p-3 group"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap flex-1">
-                            {note.note_text}
-                          </p>
-                          <button
-                            onClick={() => deleteNote(note.id)}
-                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all cursor-pointer shrink-0"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1.5">
-                          {new Date(note.created_at).toLocaleDateString(locale, {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </TabsContent>
-
-              {/* Custom Fields Tab */}
-              <TabsContent value="custom" className="flex-1 overflow-y-auto px-4 py-3">
-                {loadingCustom ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="size-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : customFields.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    {t('noCustomFields')}
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {customFields.map((field) => (
-                      <div key={field.id} className="space-y-1.5">
-                        <Label className="text-muted-foreground text-xs capitalize">
-                          {field.field_name}
+                    <form
+                      id={detailsFormId}
+                      noValidate
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!savingDetails) void saveDetails();
+                      }}
+                      className="space-y-1.5"
+                    >
+                      <div className="grid gap-1">
+                        <Label
+                          htmlFor={`${detailsFormId}-name`}
+                          className="text-muted-foreground text-[0.8125rem]"
+                        >
+                          {t('name')}
                         </Label>
                         <Input
-                          value={customValues[field.id] ?? ''}
-                          onChange={(e) =>
-                            setCustomValues((prev) => ({
-                              ...prev,
-                              [field.id]: e.target.value,
-                            }))
-                          }
-                          placeholder={t('enterCustomField', { name: field.field_name })}
-                          className="bg-muted border-border text-foreground h-8 text-sm placeholder:text-muted-foreground"
+                          id={`${detailsFormId}-name`}
+                          autoComplete="name"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="bg-background/30 h-9 md:h-8.5"
                         />
                       </div>
-                    ))}
-                    <Button
-                      onClick={saveCustomFields}
-                      disabled={savingCustom}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground w-full"
-                      size="sm"
-                    >
-                      {savingCustom ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Save className="size-3.5" />
-                      )}
-                      {t('saveCustomFieldsBtn')}
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Deals Tab */}
-              <TabsContent value="deals" className="flex-1 overflow-y-auto px-4 py-3">
-                {loadingDeals ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="size-5 animate-spin text-primary" />
-                  </div>
-                ) : deals.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">{t('dealsTab.noDeals')}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {deals.map((deal) => (
-                      <div
-                        key={deal.id}
-                        className="rounded-lg border border-border bg-muted/50 p-3"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium text-foreground">
-                            {deal.title}
-                          </p>
-                          {deal.stage && (
-                            <span
-                              className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                              style={{
-                                backgroundColor: `${deal.stage.color}20`,
-                                color: deal.stage.color,
-                              }}
-                            >
-                              {deal.stage.name}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <DollarSign className="size-3" />
-                            {formatCurrency(
-                              deal.value ?? 0,
-                              deal.currency || defaultCurrency,
-                            )}
+                      <div className="grid gap-1">
+                        <Label
+                          htmlFor={`${detailsFormId}-phone`}
+                          className="text-muted-foreground text-[0.8125rem]"
+                        >
+                          {t('phone')}{' '}
+                          <span
+                            aria-hidden="true"
+                            className="text-red-500 dark:text-red-400"
+                          >
+                            *
                           </span>
-                          {deal.status && deal.status !== 'open' && (
-                            <span
-                              className={
-                                deal.status === 'won'
-                                  ? 'text-primary'
-                                  : 'text-red-400'
-                              }
-                            >
-                              {deal.status}
-                            </span>
-                          )}
+                        </Label>
+                        <Input
+                          id={`${detailsFormId}-phone`}
+                          type="tel"
+                          autoComplete="tel"
+                          aria-required="true"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          className="bg-background/30 h-9 md:h-8.5"
+                        />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label
+                          htmlFor={`${detailsFormId}-email`}
+                          className="text-muted-foreground text-[0.8125rem]"
+                        >
+                          {t('email')}
+                        </Label>
+                        <Input
+                          id={`${detailsFormId}-email`}
+                          type="email"
+                          autoComplete="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          className="bg-background/30 h-9 md:h-8.5"
+                        />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label
+                          htmlFor={`${detailsFormId}-company`}
+                          className="text-muted-foreground text-[0.8125rem]"
+                        >
+                          {t('company')}
+                        </Label>
+                        <Input
+                          id={`${detailsFormId}-company`}
+                          autoComplete="organization"
+                          value={editCompany}
+                          onChange={(e) => setEditCompany(e.target.value)}
+                          className="bg-background/30 h-9 md:h-8.5"
+                        />
+                      </div>
+                    </form>
+                  </ContactSection>
+
+                  <ContactSection
+                    value="leads"
+                    title={t('tabs.leads')}
+                    icon={TrendingUp}
+                  >
+                    {accountId && (
+                      <ContactLeads
+                        accountId={accountId}
+                        contactId={contact.id}
+                      />
+                    )}
+                  </ContactSection>
+
+                  <ContactSection
+                    value="tags"
+                    title={t('tabs.tags')}
+                    icon={TagIcon}
+                  >
+                    {allTags.length === 0 ? (
+                      <p className="text-muted-foreground text-sm">
+                        {t('tagsTab.noTagsAvailable')}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-muted-foreground text-xs">
+                          {t('tagsTab.clickTagDesc')}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {allTags.map((tag) => {
+                            const selected = contactTagIds.includes(tag.id);
+                            return (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => toggleTag(tag.id)}
+                                disabled={savingTags}
+                                className={`text-foreground focus-visible:outline-ring inline-flex min-h-7 max-w-full cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1 text-left text-xs font-medium focus-visible:outline-2 disabled:cursor-wait ${selected ? 'border-primary' : 'border-border hover:border-primary/60'}`}
+                                style={{ backgroundColor: tag.color + '20' }}
+                              >
+                                {selected && (
+                                  <Check
+                                    aria-hidden="true"
+                                    className="size-3 shrink-0"
+                                  />
+                                )}
+                                <span
+                                  className="size-2 shrink-0 rounded-full"
+                                  style={{ backgroundColor: tag.color }}
+                                />
+                                <span className="[overflow-wrap:anywhere]">
+                                  {tag.name}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
-      </SheetContent>
-    </Sheet>
-    <TemplatePicker
-      open={templatePickerOpen}
-      onOpenChange={setTemplatePickerOpen}
-      onSelect={handleSendTemplate}
-    />
+                    )}
+                  </ContactSection>
+
+                  <ContactSection
+                    value="notes"
+                    title={t('tabs.notes')}
+                    icon={StickyNote}
+                  >
+                    <div className="space-y-2">
+                      <Textarea
+                        aria-label={t('notesTab.placeholder')}
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        placeholder={t('notesTab.placeholder')}
+                        className="bg-background/30 min-h-20"
+                      />
+                      <Button
+                        onClick={addNote}
+                        disabled={!newNote.trim() || savingNote}
+                        size="sm"
+                      >
+                        {savingNote ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Plus />
+                        )}
+                        {t('notesTab.save')}
+                      </Button>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {loadingNotes ? (
+                        <Loader2 className="text-muted-foreground mx-auto my-4 size-5 animate-spin" />
+                      ) : notes.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">
+                          {t('notesTab.noNotes')}
+                        </p>
+                      ) : (
+                        notes.map((note) => (
+                          <div
+                            key={note.id}
+                            className="border-border/70 bg-background/30 rounded-lg border p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="min-w-0 flex-1 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
+                                {note.note_text}
+                              </p>
+                              <Button
+                                onClick={() => deleteNote(note.id)}
+                                aria-label={t('actions.delete')}
+                                variant="ghost"
+                                size="icon-sm"
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 aria-hidden="true" />
+                              </Button>
+                            </div>
+                            <p className="text-muted-foreground mt-1.5 text-xs">
+                              {new Date(note.created_at).toLocaleDateString(
+                                locale,
+                                {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                }
+                              )}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ContactSection>
+
+                  <ContactSection
+                    value="custom"
+                    title={t('tabs.custom')}
+                    icon={LayoutGrid}
+                  >
+                    {loadingCustom ? (
+                      <Loader2 className="text-muted-foreground mx-auto my-4 size-5 animate-spin" />
+                    ) : customFields.length === 0 ? (
+                      <p className="text-muted-foreground text-sm">
+                        {t('noCustomFields')}
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {customFields.map((field) => (
+                          <div key={field.id} className="space-y-1.5">
+                            <Label
+                              htmlFor={`${detailsFormId}-${field.id}`}
+                              className="text-muted-foreground text-[0.8125rem] capitalize"
+                            >
+                              {field.field_name}
+                            </Label>
+                            <Input
+                              id={`${detailsFormId}-${field.id}`}
+                              value={customValues[field.id] ?? ''}
+                              onChange={(e) =>
+                                setCustomValues((prev) => ({
+                                  ...prev,
+                                  [field.id]: e.target.value,
+                                }))
+                              }
+                              placeholder={t('enterCustomField', {
+                                name: field.field_name,
+                              })}
+                              className="bg-background/30 h-9"
+                            />
+                          </div>
+                        ))}
+                        <Button
+                          onClick={saveCustomFields}
+                          disabled={savingCustom}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {savingCustom ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <Save />
+                          )}
+                          {t('saveCustomFieldsBtn')}
+                        </Button>
+                      </div>
+                    )}
+                  </ContactSection>
+                </Accordion>
+              </div>
+
+              <SheetFooter className="border-border shrink-0 border-t px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                <Button
+                  type="submit"
+                  form={detailsFormId}
+                  disabled={savingDetails}
+                  className="from-primary to-primary-hover h-11 w-full bg-linear-to-r hover:brightness-110"
+                >
+                  {savingDetails ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Save />
+                  )}
+                  {t('saveChangesBtn')}
+                </Button>
+              </SheetFooter>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+      <TemplatePicker
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
+        onSelect={handleSendTemplate}
+      />
     </>
   );
 }
