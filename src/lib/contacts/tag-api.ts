@@ -1,3 +1,5 @@
+export const CONTACT_TAGS_CHANGED = "wacrm:contact-tags-changed";
+
 interface ContactTagMutationResult {
   added?: boolean;
   dispatched?: boolean;
@@ -20,6 +22,7 @@ async function mutateContactTag(
   if (!response.ok) {
     throw new Error(body.error ?? 'Failed to update contact tag');
   }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(CONTACT_TAGS_CHANGED));
   return body;
 }
 
