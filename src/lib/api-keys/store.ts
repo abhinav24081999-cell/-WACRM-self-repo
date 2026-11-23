@@ -13,6 +13,7 @@
 
 import { supabaseAdmin } from '@/lib/flows/admin-client';
 import { ApiError } from '@/lib/api/v1/respond';
+import { workspaceFeatureAllowed } from '@/lib/auth/workspace-entitlements';
 
 /** Shape of an `api_keys` row as the auth path consumes it. */
 export interface ApiKeyRow {
@@ -35,7 +36,8 @@ export interface ApiKeyRow {
 export async function findActiveKeyByHash(
   hash: string
 ): Promise<ApiKeyRow | null> {
-  const { data, error } = await supabaseAdmin()
+  const db = supabaseAdmin();
+  const { data, error } = await db
     .from('api_keys')
     .select('id, account_id, created_by, name, scopes, expires_at, revoked_at')
     .eq('key_hash', hash)
@@ -57,6 +59,7 @@ export async function findActiveKeyByHash(
   if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
     return null;
   }
+  if (!(await workspaceFeatureAllowed(db, data.account_id, 'api'))) return null;
 
   return data as ApiKeyRow;
 }

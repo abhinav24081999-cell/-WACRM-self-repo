@@ -1,3 +1,4 @@
+import { workspaceFeatureAllowed } from '@/lib/auth/workspace-entitlements'
 import { NextResponse } from 'next/server';
 import { isUuid } from '@/lib/api/v1/pagination';
 import { requireRole, toErrorResponse } from '@/lib/auth/account';
@@ -127,6 +128,9 @@ export async function POST(request: Request) {
         .maybeSingle();
       if (error) return failure('Could not load this webhook.', 500);
       if (!data) return failure('Webhook not found.', 404);
+      if (!(await workspaceFeatureAllowed(supabase, accountId, 'webhooks'))) {
+        return failure('Your workspace plan does not include webhooks.', 403);
+      }
       const delivery = await testWebhookDelivery(
         supabaseAdmin(),
         accountId,

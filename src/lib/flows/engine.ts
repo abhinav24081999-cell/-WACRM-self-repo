@@ -32,6 +32,7 @@
  *     INSERT raises 23505 and the runner catches & exits.
  */
 
+import { workspaceFeatureAllowed } from '@/lib/auth/workspace-entitlements'
 import { supabaseAdmin } from "./admin-client";
 import {
   engineSendInteractiveButtons,
@@ -991,6 +992,9 @@ export async function dispatchInboundToFlows(
   const db = supabaseAdmin();
   let ownedRunId: string | null = null;
   try {
+    if (!(await workspaceFeatureAllowed(db, input.accountId, 'automation'))) {
+      return { consumed: false, outcome: 'no_match' };
+    }
     const activeRun = await loadActiveRunForContact(
       db,
       input.accountId,

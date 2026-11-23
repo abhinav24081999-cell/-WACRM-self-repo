@@ -33,8 +33,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getDashboardData, WORKSPACE_PAGE_SIZE } from './dashboard-data';
-import { ProvisionCustomerForm } from './provision-customer-form';
+import { ProvisionUserForm } from '@/components/users/provision-user-form';
 import { WorkspaceDetails } from './workspace-details';
+import { getPlans, getWorkspacePlans } from './plan-data';
 
 export default async function PlatformAdminPage({
   searchParams,
@@ -43,9 +44,10 @@ export default async function PlatformAdminPage({
 }) {
   if (!(await getPlatformAdmin())) redirect('/dashboard');
 
-  const [t, access, locale, params] = await Promise.all([
+  const [t, access, planText, locale, params] = await Promise.all([
     getTranslations('PlatformDashboard'),
     getTranslations('PlatformAccess'),
+    getTranslations('WorkspacePlans'),
     getLocale(),
     searchParams,
   ]);
@@ -64,6 +66,16 @@ export default async function PlatformAdminPage({
     search,
     (page - 1) * WORKSPACE_PAGE_SIZE,
     readOnly
+  );
+  const [plans, workspacePlans] = await Promise.all([
+    getPlans(readOnly),
+    getWorkspacePlans(
+      data?.workspaces.map((workspace) => workspace.id) ?? [],
+      readOnly
+    ),
+  ]);
+  const assignmentById = new Map(
+    workspacePlans?.map((assignment) => [assignment.account_id, assignment])
   );
   const number = new Intl.NumberFormat(locale);
   const date = new Intl.DateTimeFormat(locale, {
@@ -124,21 +136,32 @@ export default async function PlatformAdminPage({
             {t('description')}
           </p>
         </div>
-        <Dialog>
-          <DialogTrigger render={<Button className="h-11 px-4" />}>
-            <Plus aria-hidden="true" />
-            {access('createCustomer')}
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader className="pr-7">
-              <DialogTitle>{access('createCustomer')}</DialogTitle>
-              <DialogDescription>
-                {access('createDescription')}
-              </DialogDescription>
-            </DialogHeader>
-            <ProvisionCustomerForm readOnly={readOnly} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/platform-admin/plans"
+            className={buttonVariants({
+              variant: 'outline',
+              className: 'h-11',
+            })}
+          >
+            {planText('title')}
+          </Link>
+          <Dialog>
+            <DialogTrigger render={<Button className="h-11 px-4" />}>
+              <Plus aria-hidden="true" />
+              {access('createCustomer')}
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader className="pr-7">
+                <DialogTitle>{access('createCustomer')}</DialogTitle>
+                <DialogDescription>
+                  {access('createDescription')}
+                </DialogDescription>
+              </DialogHeader>
+              <ProvisionUserForm readOnly={readOnly} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {readOnly && (
@@ -251,6 +274,8 @@ export default async function PlatformAdminPage({
                               new Date(workspace.created_at)
                             )}
                             readOnly={readOnly}
+                            plans={workspacePlans ? plans : null}
+                            assignment={assignmentById.get(workspace.id)}
                           />
                         </TableCell>
                       </TableRow>

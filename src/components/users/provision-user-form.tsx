@@ -7,8 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export function ProvisionCustomerForm({ readOnly }: { readOnly: boolean }) {
+export function ProvisionUserForm({
+  readOnly,
+  staff = false,
+  onCreated,
+}: {
+  readOnly: boolean;
+  staff?: boolean;
+  onCreated?: () => void;
+}) {
   const t = useTranslations('PlatformAccess');
+  const staffText = useTranslations('WorkspacePlans');
+  const roles = useTranslations('Settings.roles');
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -25,20 +35,25 @@ export function ProvisionCustomerForm({ readOnly }: { readOnly: boolean }) {
     setError('');
 
     try {
-      const response = await fetch('/api/platform-admin/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: values.get('email'),
-          name: values.get('name'),
-        }),
-      });
+      const response = await fetch(
+        staff ? '/api/account/members' : '/api/platform-admin/customers',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: values.get('email'),
+            name: values.get('name'),
+            ...(staff && { role: values.get('role') }),
+          }),
+        }
+      );
       const result = await response.json();
       if (!response.ok) {
         setError(result.error ?? t('createFailed'));
         return;
       }
       setCredentials(result);
+      onCreated?.();
       router.refresh();
     } catch {
       setError(t('createFailed'));
@@ -51,7 +66,9 @@ export function ProvisionCustomerForm({ readOnly }: { readOnly: boolean }) {
     return (
       <div className="flex flex-col gap-4">
         <div role="status">
-          <p className="text-foreground font-medium">{t('created')}</p>
+          <p className="text-foreground font-medium">
+            {staff ? staffText('staffCreated') : t('created')}
+          </p>
           <p className="text-muted-foreground mt-1 text-sm">
             {t('shareCredentials', { email: credentials.email })}
           </p>
@@ -86,7 +103,7 @@ export function ProvisionCustomerForm({ readOnly }: { readOnly: boolean }) {
     >
       {readOnly && (
         <p className="bg-muted text-foreground rounded-lg px-3 py-2 text-sm">
-          {t('previewReadOnly')}
+          {staff ? staffText('preview') : t('previewReadOnly')}
         </p>
       )}
       {error && (
@@ -96,7 +113,9 @@ export function ProvisionCustomerForm({ readOnly }: { readOnly: boolean }) {
       )}
       <fieldset disabled={readOnly || busy} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="customer-name">{t('customerName')}</Label>
+          <Label htmlFor="customer-name">
+            {staff ? staffText('staffName') : t('customerName')}
+          </Label>
           <Input
             id="customer-name"
             name="name"
@@ -118,12 +137,31 @@ export function ProvisionCustomerForm({ readOnly }: { readOnly: boolean }) {
             className="h-11"
           />
         </div>
+        {staff && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="staff-role">{staffText('staffRole')}</Label>
+            <select
+              id="staff-role"
+              name="role"
+              defaultValue="agent"
+              className="border-input bg-background h-11 rounded-lg border px-3"
+            >
+              {(['admin', 'agent', 'viewer'] as const).map((role) => (
+                <option key={role} value={role}>
+                  {roles(role)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <Button
           type="submit"
           disabled={readOnly || busy}
           className="h-11 self-start"
         >
-          {busy ? t('creating') : t('createCustomer')}
+          {staff
+            ? staffText(busy ? 'saving' : 'createStaff')
+            : t(busy ? 'creating' : 'createCustomer')}
         </Button>
       </fieldset>
     </form>

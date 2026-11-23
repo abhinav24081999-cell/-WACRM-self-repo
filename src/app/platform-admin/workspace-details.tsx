@@ -16,15 +16,21 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Workspace } from './dashboard-data';
+import type { Plan, WorkspacePlan } from '@/lib/auth/workspace-plan';
+import { WorkspacePlanForm } from './workspace-plan-form';
 
 export function WorkspaceDetails({
   workspace,
   created,
   readOnly,
+  plans,
+  assignment,
 }: {
   workspace: Workspace;
   created: string;
   readOnly: boolean;
+  plans: Plan[] | null;
+  assignment: WorkspacePlan | undefined;
 }) {
   const t = useTranslations('PlatformDashboard');
   const router = useRouter();
@@ -88,7 +94,7 @@ export function WorkspaceDetails({
       >
         {t('view')}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
         <DialogHeader className="pr-7">
           <DialogTitle className="text-lg wrap-anywhere">
             {workspace.name}
@@ -135,6 +141,14 @@ export function WorkspaceDetails({
               {busy ? t('saving') : t('save')}
             </Button>
           </form>
+        )}
+        {plans && (
+          <WorkspacePlanForm
+            accountId={workspace.id}
+            plans={plans}
+            assignment={assignment}
+            readOnly={readOnly}
+          />
         )}
       </DialogContent>
     </Dialog>
