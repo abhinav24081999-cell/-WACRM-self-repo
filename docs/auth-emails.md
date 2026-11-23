@@ -37,6 +37,20 @@ workspace counts and recent audit activity from the database. A name
 change and its audit entry commit in the same transaction. Vercel
 previews use sample data and block customer writes.
 
+## Releasing workspace plans and roles
+
+Apply `20261123125000_workspace_plans_roles.sql` after the Super Admin
+migration. Existing workspaces have unrestricted access until the
+platform administrator assigns a plan. Lower limits prevent additional
+contacts, admin or agent seats, and WhatsApp configurations. Existing
+records remain accessible. Archived plans continue to apply to current
+customers.
+The current messaging schema supports one WhatsApp number per workspace.
+
+Workspace owners can adjust Admin and Agent permissions in Settings →
+Members. Admins and owners can create staff logins in their workspace.
+Send the initial password to the new staff member privately.
+
 ## What the app does
 
 Every emailed link is asked to return to the app's own origin at

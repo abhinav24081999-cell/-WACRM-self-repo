@@ -38,6 +38,9 @@ function rpcErrorToResponse(err: PostgrestError): NextResponse {
   if (err.code === "22023") {
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
+  if (err.code === "23514" && err.message.startsWith("Workspace plan limit")) {
+    return NextResponse.json({ error: err.message }, { status: 409 });
+  }
   console.error("[members route] unexpected RPC error:", err);
   return NextResponse.json(
     { error: t('account.members.updateFailed') },

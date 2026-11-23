@@ -6,7 +6,7 @@ import { canReplyAt, connectionFor, sendSocialText } from '@/lib/social/meta'
 
 export async function POST(request: Request) {
   try {
-    const { supabase, accountId, userId } = await requireRole('agent')
+    const { supabase, accountId, userId } = await requireRole('agent', 'inbox')
     const limit = checkRateLimit(`send:${userId}`, RATE_LIMITS.send)
     if (!limit.success) return rateLimitResponse(limit)
 

@@ -16,6 +16,8 @@ DECLARE
   v_customer uuid := gen_random_uuid();
   v_actor uuid := gen_random_uuid();
   v_workspace uuid;
+  v_plan uuid;
+  v_staff uuid := gen_random_uuid();
 BEGIN
   -- The core tables, from 001.
   IF to_regclass('public.messages') IS NULL THEN
@@ -215,6 +217,37 @@ BEGIN
       RAISE EXCEPTION 'Platform audit or searchable workspace directory did not reflect the saved rename';
     END IF;
 
+    INSERT INTO public.platform_plans (name, monthly_price_paise, yearly_price_paise, max_contacts, max_team, features)
+    VALUES ('Phase 3 check', 10000, 100000, 0, 1, ARRAY['campaigns'])
+    RETURNING id INTO v_plan;
+    IF public.platform_assign_workspace_plan(v_workspace, v_plan, v_actor, 1, NULL, NULL, NULL)
+      IS DISTINCT FROM 'saved' THEN
+      RAISE EXCEPTION 'Platform plan assignment did not succeed';
+    END IF;
+    IF public.workspace_feature_allowed(v_workspace, 'api')
+      OR NOT public.workspace_feature_allowed(v_workspace, 'campaigns') THEN
+      RAISE EXCEPTION 'Workspace plan features were not applied';
+    END IF;
+
+    INSERT INTO public.contacts (user_id, account_id, phone) VALUES (v_customer, v_workspace, '15550000031');
+    BEGIN
+      INSERT INTO public.contacts (user_id, account_id, phone) VALUES (v_customer, v_workspace, '15550000032');
+      RAISE EXCEPTION 'Workspace contact limit was not enforced';
+    EXCEPTION WHEN check_violation THEN
+      IF SQLERRM NOT LIKE 'Workspace plan limit%' THEN RAISE; END IF;
+    END;
+
+    INSERT INTO auth.users (id, email, raw_user_meta_data)
+    VALUES (v_staff, 'phase3-staff@example.test', '{"full_name":"Phase 3 staff"}');
+    UPDATE auth.users SET raw_app_meta_data = jsonb_build_object(
+      'wacrm_staff_assignment', jsonb_build_object('account_id', v_workspace, 'role', 'agent', 'actor_id', v_customer)
+    ) WHERE id = v_staff;
+    IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE user_id = v_staff AND account_id = v_workspace AND account_role = 'agent')
+      OR NOT EXISTS (SELECT 1 FROM public.workspace_staff_provisioning_log WHERE user_id = v_staff AND actor_user_id = v_customer)
+      OR EXISTS (SELECT 1 FROM public.accounts WHERE owner_user_id = v_staff) THEN
+      RAISE EXCEPTION 'Staff provisioning did not create the audited workspace membership';
+    END IF;
+
     RAISE SQLSTATE 'P1010';
   EXCEPTION WHEN SQLSTATE 'P1010' THEN
     NULL;
@@ -225,6 +258,11 @@ BEGIN
     OR has_function_privilege('anon', 'public.platform_admin_snapshot(text,integer)', 'EXECUTE')
     OR has_function_privilege('authenticated', 'public.platform_admin_snapshot(text,integer)', 'EXECUTE') THEN
     RAISE EXCEPTION 'Platform workspace management grants are too broad';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.platform_plans', 'SELECT')
+    OR has_function_privilege('authenticated', 'public.platform_assign_workspace_plan(uuid,uuid,uuid,integer,integer,integer,text[])', 'EXECUTE')
+    OR has_function_privilege('anon', 'public.workspace_feature_allowed(uuid,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Workspace plan management grants are too broad';
   END IF;
 
   RAISE NOTICE 'schema verification passed';

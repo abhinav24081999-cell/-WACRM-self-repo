@@ -1,8 +1,12 @@
 import { supabaseAdmin } from '@/lib/flows/admin-client'
+import { workspaceFeatureAllowed } from '@/lib/auth/workspace-entitlements'
 import { conversionTarget, DeliveryError, googleAccessToken, liveFeedbackEnabled, sendConversion, type ConversionEvent } from './providers'
 
 export async function runConversionQueue(accountId: string) {
   const db = supabaseAdmin()
+  if (!(await workspaceFeatureAllowed(db, accountId, 'capi'))) {
+    return { processed: 0, accepted: 0, tested: 0, retrying: 0, failed: 0, needsReview: 0 }
+  }
   const { data, error } = await db.rpc('claim_conversion_feedback', {
     p_account_id: accountId, p_allow_live: liveFeedbackEnabled(),
   })

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock('@/lib/auth/workspace-entitlements', () => ({
+  workspaceActionAllowed: async () => true,
+  workspaceFeatureAllowed: async () => true,
+}));
+
 // ============================================================
 // Entry-trigger dispatch (issue #490).
 //

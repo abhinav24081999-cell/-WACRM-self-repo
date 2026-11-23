@@ -1,5 +1,10 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 
+vi.mock('@/lib/auth/workspace-entitlements', () => ({
+  workspaceActionAllowed: async () => true,
+  workspaceFeatureAllowed: async () => true,
+}));
+
 // ============================================================
 // Fakes for the interpolation tests at the bottom of this file
 // (issue #553). Same shape as dispatch.test.ts: a minimal Supabase
