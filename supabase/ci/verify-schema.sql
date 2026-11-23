@@ -15,6 +15,7 @@ DO $$
 DECLARE
   v_customer uuid := gen_random_uuid();
   v_actor uuid := gen_random_uuid();
+  v_workspace uuid;
 BEGIN
   -- The core tables, from 001.
   IF to_regclass('public.messages') IS NULL THEN
@@ -196,10 +197,35 @@ BEGIN
       RAISE EXCEPTION 'Platform provisioning did not record the actor and owned workspace';
     END IF;
 
+    SELECT account_id INTO v_workspace
+    FROM public.platform_user_provisioning_log WHERE user_id = v_customer;
+    IF public.platform_rename_workspace(v_workspace, 'Phase 1 check', 'Renamed workspace', v_actor)
+      IS DISTINCT FROM 'updated' THEN
+      RAISE EXCEPTION 'Platform workspace rename did not succeed';
+    END IF;
+    IF public.platform_rename_workspace(v_workspace, 'Phase 1 check', 'Stale edit', v_actor)
+      IS DISTINCT FROM 'conflict' THEN
+      RAISE EXCEPTION 'Platform workspace rename accepted a stale edit';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.platform_workspace_rename_log
+      WHERE account_id = v_workspace AND actor_user_id = v_actor AND new_name = 'Renamed workspace'
+    ) OR public.platform_admin_snapshot('phase1-check@example.test', 0) #>> '{workspaces,0,name}'
+      IS DISTINCT FROM 'Renamed workspace' THEN
+      RAISE EXCEPTION 'Platform audit or searchable workspace directory did not reflect the saved rename';
+    END IF;
+
     RAISE SQLSTATE 'P1010';
   EXCEPTION WHEN SQLSTATE 'P1010' THEN
     NULL;
   END;
+
+  IF has_table_privilege('authenticated', 'public.platform_workspace_rename_log', 'SELECT')
+    OR has_function_privilege('authenticated', 'public.platform_rename_workspace(uuid,text,text,uuid)', 'EXECUTE')
+    OR has_function_privilege('anon', 'public.platform_admin_snapshot(text,integer)', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.platform_admin_snapshot(text,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Platform workspace management grants are too broad';
+  END IF;
 
   RAISE NOTICE 'schema verification passed';
 END

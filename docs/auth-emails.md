@@ -29,6 +29,14 @@ and the provisioning API. The hosted signup setting is independent of
 the Vercel deployment and stays in effect if the application is rolled
 back.
 
+## Releasing the Super Admin dashboard
+
+Apply `20261123124000_platform_admin_dashboard.sql` after the secure
+access migration and before releasing Phase 2. The dashboard reads
+workspace counts and recent audit activity from the database. A name
+change and its audit entry commit in the same transaction. Vercel
+previews use sample data and block customer writes.
+
 ## What the app does
 
 Every emailed link is asked to return to the app's own origin at

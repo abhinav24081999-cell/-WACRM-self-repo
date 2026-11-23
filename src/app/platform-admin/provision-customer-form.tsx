@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { Label } from '@/components/ui/label';
 
 export function ProvisionCustomerForm({ readOnly }: { readOnly: boolean }) {
   const t = useTranslations('PlatformAccess');
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [credentials, setCredentials] = useState<{
@@ -37,6 +39,7 @@ export function ProvisionCustomerForm({ readOnly }: { readOnly: boolean }) {
         return;
       }
       setCredentials(result);
+      router.refresh();
     } catch {
       setError(t('createFailed'));
     } finally {
