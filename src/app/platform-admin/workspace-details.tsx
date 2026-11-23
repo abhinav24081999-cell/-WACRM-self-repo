@@ -1,10 +1,11 @@
 'use client';
+import Link from 'next/link';
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ export function WorkspaceDetails({
   assignment: WorkspacePlan | undefined;
 }) {
   const t = useTranslations('PlatformDashboard');
+  const commercial = useTranslations('PlatformCommercial');
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -111,6 +113,17 @@ export function WorkspaceDetails({
             </div>
           ))}
         </dl>
+        {!readOnly && (
+          <Link
+            href={`/platform-admin/commercial/${workspace.id}`}
+            className={buttonVariants({
+              variant: 'outline',
+              className: 'h-11 justify-self-start',
+            })}
+          >
+            {commercial('title')}
+          </Link>
+        )}
         {!readOnly && (
           <form
             onSubmit={rename}

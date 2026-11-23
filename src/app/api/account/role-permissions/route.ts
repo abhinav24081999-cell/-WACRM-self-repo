@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const ctx = await requireRole('owner');
     if (isSharedPreview())
-      return Response.json({ admin: [], agent: ['campaigns'], readOnly: true });
+      return Response.json({ error: t('preview') }, { status: 503 });
     const { data, error } = await ctx.supabase
       .from('workspace_role_permissions')
       .select('role,denied')
