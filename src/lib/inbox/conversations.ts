@@ -57,10 +57,10 @@ export interface ContactFilters {
 export function matchesContactFilters(
   conversation: Conversation,
   { tagIds, company }: ContactFilters,
+  contactTags: Pick<Tag, "id">[] = conversation.contact?.tags ?? [],
 ): boolean {
   if (tagIds.length > 0) {
-    const contactTagIds = conversation.contact?.tags ?? [];
-    if (!contactTagIds.some((t) => tagIds.includes(t.id))) return false;
+    if (!contactTags.some((t) => tagIds.includes(t.id))) return false;
   }
 
   if (company !== null && conversation.contact?.company?.trim() !== company) {

@@ -332,6 +332,35 @@
     "page": {
       "whatsappNotConnected": "WhatsApp®이 연결되어 있지 않습니다. 설정으로 이동해 계정을 연결하세요."
     },
+    "conversationLabels": {
+      "metaStatus": "Meta 상태",
+      "tags": "연락처 태그",
+      "viewTags": "연락처 태그 {count}개 보기",
+      "conversionStatus": "전환 API 상태",
+      "viewCapi": "전환 API 상태 보기: {status}",
+      "receiptHint": "수락은 Meta가 이벤트를 받았음을 뜻합니다. 광고 기여는 Meta에서 확인합니다.",
+      "notSentHint": "적격 단계에 도달했으며 대기열에 추가할 수 있습니다.",
+      "testStatus": "테스트: {status}",
+      "attempts": "시도 {count}회",
+      "sentAt": "전송 {date}",
+      "status": {
+        "accepted": "수락됨",
+        "pending": "대기 중",
+        "sending": "전송 중",
+        "failed": "실패",
+        "retrying": "재시도 중",
+        "skipped": "건너뜀",
+        "tested": "테스트 완료",
+        "needs_review": "검토 필요",
+        "not_sent": "미전송"
+      },
+      "issue": {
+        "credentials": "Meta 연결 또는 자격 증명을 확인하세요.",
+        "identifiers": "리드의 Meta 식별자를 확인하세요.",
+        "uncertain": "Meta로의 전송을 확인할 수 없습니다.",
+        "delivery": "전환 기록에서 이벤트를 검토하세요."
+      }
+    },
     "conversationList": {
       "channelFilter": "채널",
       "allChannels": "모든 채널",

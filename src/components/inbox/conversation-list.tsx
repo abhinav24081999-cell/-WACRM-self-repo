@@ -24,6 +24,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ConversationLabels } from "@/components/inbox/conversation-labels";
+import { CONTACT_TAGS_CHANGED } from "@/lib/contacts/tag-api";
+import { INBOX_LABEL_BATCH, type InboxLabels } from "@/lib/inbox/labels";
 
 interface ConversationListProps {
   activeConversationId: string | null;
@@ -78,6 +81,44 @@ export function ConversationList({
     return () => window.clearInterval(id);
   }, []);
   const [loading, setLoading] = useState(true);
+  const [labels, setLabels] = useState<InboxLabels>({});
+  const [tagRevision, setTagRevision] = useState(0);
+  const conversationIds = useMemo(() => conversations.map(({ id }) => id).sort().join(","), [conversations]);
+
+  useEffect(() => {
+    const onTagsChanged = () => setTagRevision(value => value + 1);
+    window.addEventListener(CONTACT_TAGS_CHANGED, onTagsChanged);
+    return () => window.removeEventListener(CONTACT_TAGS_CHANGED, onTagsChanged);
+  }, []);
+
+  useEffect(() => {
+    if (!conversationIds || document.visibilityState === "hidden") return;
+    const controller = new AbortController();
+    const ids = conversationIds.split(",");
+    for (let start = 0; start < ids.length; start += INBOX_LABEL_BATCH) {
+      const batch = ids.slice(start, start + INBOX_LABEL_BATCH);
+      void fetch("/api/inbox/labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(batch),
+        signal: controller.signal,
+      }).then(async response => {
+        if (!response.ok) return;
+        const received: InboxLabels = await response.json();
+        if (!controller.signal.aborted) {
+          setLabels(previous => {
+            const next = { ...previous };
+            for (const id of batch) {
+              if (received[id]) next[id] = received[id];
+              else delete next[id];
+            }
+            return next;
+          });
+        }
+      }).catch(() => {});
+    }
+    return () => controller.abort();
+  }, [conversationIds, now, resyncToken, tagRevision]);
   // Contact-based filters (issue #272). Tags use OR logic (a conversation
   // matches if its contact carries any selected tag), consistent with
   // Broadcast audience filtering. Company is an exact match on the field.
@@ -182,7 +223,7 @@ export function ConversationList({
         matchesContactFilters(c, {
           tagIds: selectedTagIds,
           company: selectedCompany,
-        })
+        }, labels[c.id]?.tags)
       );
     }
 
@@ -197,7 +238,7 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, channel, now, search, selectedTagIds, selectedCompany]);
+  }, [conversations, filter, channel, now, search, selectedTagIds, selectedCompany, labels]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -431,6 +472,7 @@ export function ConversationList({
               <ConversationItem
                 key={conv.id}
                 conversation={conv}
+                labels={labels[conv.id]}
                 isActive={conv.id === activeConversationId}
                 onSelect={handleSelect}
                 t={t}
@@ -445,6 +487,7 @@ export function ConversationList({
 
 interface ConversationItemProps {
   conversation: Conversation;
+  labels?: InboxLabels[string];
   isActive: boolean;
   onSelect: (conversation: Conversation) => void;
   t: ReturnType<typeof useTranslations>;
@@ -452,12 +495,15 @@ interface ConversationItemProps {
 
 function ConversationItem({
   conversation,
+  labels,
   isActive,
   onSelect,
   t,
 }: ConversationItemProps) {
   const dateLocale = getDateLocale(useLocale());
   const contact = conversation.contact;
+  const rowTags = labels?.tags ?? contact?.tags ?? [];
+  const hasLabels = rowTags.length > 0 || Boolean(labels?.capi);
   const displayName =
     contact?.name ||
     socialSenderLabel(conversation.channel, conversation.channel_sender_id) ||
@@ -477,57 +523,59 @@ function ConversationItem({
     : "";
 
   return (
-    <button
-      onClick={handleClick}
-      className={cn(
-        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
-        isActive && "border-l-2 border-primary bg-muted/70"
-      )}
-    >
-      {/* Avatar */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
-        {contact?.avatar_url ? (
-          <img
-            src={contact.avatar_url}
-            alt={displayName}
-            className="h-10 w-10 rounded-full object-cover"
-          />
-        ) : (
-          initials
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
-            {displayName}
-          </span>
-          <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
-        </div>
-        <p className="truncate text-[11px] text-muted-foreground">
-          {channelLabel(conversation.channel, conversation.channel_account_label)}
-        </p>
-        <div className="mt-0.5 flex items-center justify-between gap-2">
-          <p className="truncate text-xs text-muted-foreground">
-            {conversation.last_message_text || t("noMessagesYet")}
-          </p>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {conversation.unread_count > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                {conversation.unread_count}
-              </span>
-            )}
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full",
-                STATUS_COLORS[conversation.status]
-              )}
-              title={conversation.status}
+    <div className={cn(
+      "min-w-0 border-l-2 border-transparent transition-colors hover:bg-muted/50",
+      isActive && "border-primary bg-muted/70"
+    )}>
+      <button type="button" onClick={handleClick}
+        className={cn("flex w-full items-start gap-3 px-3 pt-3 text-left focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-ring",
+          hasLabels ? "pb-0.5" : "pb-3")}>
+        {/* Avatar */}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
+          {contact?.avatar_url ? (
+            <img
+              src={contact.avatar_url}
+              alt={displayName}
+              className="h-10 w-10 rounded-full object-cover"
             />
+          ) : (
+            initials
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-sm font-medium text-foreground">
+              {displayName}
+            </span>
+            <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
+          </div>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {channelLabel(conversation.channel, conversation.channel_account_label)}
+          </p>
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <p className="truncate text-xs text-muted-foreground">
+              {conversation.last_message_text || t("noMessagesYet")}
+            </p>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {conversation.unread_count > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                  {conversation.unread_count}
+                </span>
+              )}
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  STATUS_COLORS[conversation.status]
+                )}
+                title={conversation.status}
+              />
+            </div>
           </div>
         </div>
-      </div>
-    </button>
+      </button>
+      <ConversationLabels tags={rowTags} capi={labels?.capi} />
+    </div>
   );
 }
