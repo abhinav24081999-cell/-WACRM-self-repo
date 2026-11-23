@@ -87,8 +87,8 @@ export async function POST(request: Request) {
       knowledge,
     })
 
-    const { text, handoff } = await generateReply({ config, systemPrompt, messages })
-    return NextResponse.json({ reply: text, handoff })
+    const { text, handoff, assessment } = await generateReply({ config, systemPrompt, messages, withAssessment: true })
+    return NextResponse.json({ reply: text, handoff, assessment })
   } catch (err) {
     if (err instanceof AiError) {
       return NextResponse.json(

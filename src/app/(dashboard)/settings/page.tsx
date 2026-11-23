@@ -18,6 +18,7 @@ import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel'
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { InboxSettings } from '@/components/settings/inbox-settings';
 import { MembersTab } from '@/components/settings/members-tab';
+import { WebhookManager } from '@/components/settings/webhook-manager';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import { ConversionFeedbackSettings } from '@/components/settings/conversion-feedback-settings';
 import {
@@ -84,6 +85,7 @@ function SettingsPageInner() {
     deals: <DealsSettings />,
     members: <MembersTab />,
     api: <ApiKeysSettings />,
+    webhooks: <WebhookManager />,
     'conversion-feedback': <ConversionFeedbackSettings />,
   };
 

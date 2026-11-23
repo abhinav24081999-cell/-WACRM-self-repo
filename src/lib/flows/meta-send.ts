@@ -124,6 +124,12 @@ export async function engineSendText(
   )
 
   const attempt = async (phone: string): Promise<string> => {
+    if (args.aiGenerated) {
+      const { data: thread, error } = await db.from('conversations')
+        .select('id').eq('account_id', args.accountId).eq('id', args.conversationId)
+        .eq('ai_autoreply_disabled', false).is('assigned_agent_id', null).maybeSingle()
+      if (error || !thread) throw new Error('AI no longer owns this conversation.')
+    }
     const r = await sendTextMessage({
       phoneNumberId,
       accessToken,

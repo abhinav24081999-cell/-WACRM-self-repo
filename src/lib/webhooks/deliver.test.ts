@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 vi.mock('@/lib/whatsapp/encryption', () => ({
@@ -6,13 +6,15 @@ vi.mock('@/lib/whatsapp/encryption', () => ({
   encrypt: (s: string) => s,
 }));
 
-// Control the SSRF guard per-test.
-vi.mock('@/lib/webhooks/ssrf', () => ({
-  isDeliverableUrl: vi.fn(async () => true),
+vi.mock('./post', () => ({
+  BlockedWebhookDestination: class extends Error {},
+  postWebhook: vi.fn(),
 }));
 
 import { dispatchWebhookEvent, MAX_CONSECUTIVE_FAILURES } from './deliver';
-import { isDeliverableUrl } from './ssrf';
+import { BlockedWebhookDestination, postWebhook } from './post';
+
+const post = vi.mocked(postWebhook);
 
 interface Row {
   id: string;
@@ -58,15 +60,10 @@ function makeDb(rows: Row[], calls: Calls) {
 const emptyCalls = (): Calls => ({ updates: [], rpcs: [] });
 
 beforeEach(() => {
-  vi.mocked(isDeliverableUrl).mockResolvedValue(true);
-  vi.stubGlobal('fetch', vi.fn());
+  post.mockReset().mockResolvedValue({ status: 200, body: '' });
 });
-afterEach(() => vi.unstubAllGlobals());
-
 describe('dispatchWebhookEvent', () => {
   it('signs + POSTs (no redirect follow) and resets failure_count on success', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 } as Response);
-    vi.stubGlobal('fetch', fetchMock);
     const calls = emptyCalls();
 
     await dispatchWebhookEvent(
@@ -76,20 +73,22 @@ describe('dispatchWebhookEvent', () => {
       { x: 1 }
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, opts] = fetchMock.mock.calls[0];
+    expect(post).toHaveBeenCalledTimes(1);
+    const [url, headers, body] = post.mock.calls[0];
     expect(url).toBe('https://a.test/hook');
-    expect(opts.redirect).toBe('manual');
-    expect(opts.headers['X-Wacrm-Event']).toBe('message.received');
-    expect(opts.headers['X-Wacrm-Signature']).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+    expect(headers['X-Wacrm-Event']).toBe('message.received');
+    expect(headers['X-Wacrm-Signature']).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
     // Payload carries a dedupe id.
-    expect(JSON.parse(opts.body).id).toMatch(/[0-9a-f-]{36}/);
-    expect(calls.updates[0]).toMatchObject({ id: 'a', payload: { failure_count: 0 } });
-    expect(calls.rpcs).toHaveLength(0);
+    expect(JSON.parse(body).id).toMatch(/[0-9a-f-]{36}/);
+    expect(calls.updates[0]).toMatchObject({
+      id: 'a',
+      payload: { failure_count: 0 },
+    });
+    expect(calls.rpcs.map((r) => r.name)).toEqual(['log_webhook_delivery']);
   });
 
   it('records an atomic failure (RPC) when the endpoint errors', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 } as Response));
+    post.mockResolvedValueOnce({ status: 500, body: '' });
     const calls = emptyCalls();
 
     await dispatchWebhookEvent(
@@ -99,7 +98,7 @@ describe('dispatchWebhookEvent', () => {
       {}
     );
 
-    expect(calls.rpcs[0]).toEqual({
+    expect(calls.rpcs[1]).toEqual({
       name: 'record_webhook_failure',
       args: { endpoint_id: 'b', max_failures: MAX_CONSECUTIVE_FAILURES },
     });
@@ -107,9 +106,7 @@ describe('dispatchWebhookEvent', () => {
   });
 
   it('blocks a non-public target (SSRF guard) without fetching', async () => {
-    vi.mocked(isDeliverableUrl).mockResolvedValue(false);
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    post.mockRejectedValueOnce(new BlockedWebhookDestination());
     const calls = emptyCalls();
 
     await dispatchWebhookEvent(
@@ -119,16 +116,19 @@ describe('dispatchWebhookEvent', () => {
       {}
     );
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(calls.rpcs[0].name).toBe('record_webhook_failure');
+    expect(calls.rpcs[0].args.p_result).toBe('blocked_destination');
+    expect(calls.rpcs[1].name).toBe('record_webhook_failure');
   });
 
   it('does nothing when no endpoints are subscribed', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
     const calls = emptyCalls();
-    await dispatchWebhookEvent(makeDb([], calls), 'acct-1', 'message.received', {});
-    expect(fetchMock).not.toHaveBeenCalled();
+    await dispatchWebhookEvent(
+      makeDb([], calls),
+      'acct-1',
+      'message.received',
+      {}
+    );
+    expect(post).not.toHaveBeenCalled();
     expect(calls.rpcs).toHaveLength(0);
     expect(calls.updates).toHaveLength(0);
   });

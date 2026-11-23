@@ -79,6 +79,10 @@ export async function POST(request: Request) {
       )
     }
 
+    if (config.provider === 'n8n') {
+      return NextResponse.json({ error: 'External workflows run through the test chat and automatic WhatsApp replies.' }, { status: 400 })
+    }
+
     const messages = await buildConversationContext(supabase, conversationId)
     // Nothing to draft from — a brand-new thread with no customer text
     // would otherwise produce a nonsensical reply-to-nothing.

@@ -4,11 +4,13 @@ import {
   requireRole,
   toErrorResponse,
 } from '@/lib/auth/account'
+import { isUuid } from '@/lib/api/v1/pagination'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
 import { validateAiCredentials } from '@/lib/ai/validate'
 import { embedTexts } from '@/lib/ai/embeddings'
 import { AiError, type AiProvider } from '@/lib/ai/types'
+import { normalizeN8nUrl, N8N_MODEL } from '@/lib/ai/providers/n8n'
 import { normalizeOpenAiCompatibleBaseUrl } from '@/lib/ai/providers/openai-compatible'
 import { canReuseStoredAiKey } from '@/lib/ai/stored-key'
 import { getT } from '@/lib/i18n/translate'
@@ -35,7 +37,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key',
+        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key, qualification_criteria, apply_qualified_status, qualified_tag_id, agent_name, agent_purpose, agent_language',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -83,10 +85,10 @@ export async function POST(request: Request) {
     if (!body || typeof body !== 'object') return bad(t('common.invalidRequestBody'))
 
     const provider = body.provider as AiProvider
-    if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'openai_compatible') {
+    if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'gemini' && provider !== 'n8n' && provider !== 'openai_compatible') {
       return bad(t('ai.providerInvalid'))
     }
-    const model = typeof body.model === 'string' ? body.model.trim() : ''
+    const model = provider === 'n8n' ? N8N_MODEL : typeof body.model === 'string' ? body.model.trim() : ''
     if (!model) return bad(t('ai.modelRequired'))
 
     const baseUrlProvided = 'base_url' in body
@@ -96,6 +98,22 @@ export async function POST(request: Request) {
       typeof body.system_prompt === 'string' && body.system_prompt.trim()
         ? body.system_prompt.trim()
         : null
+    const name = typeof body.agent_name === 'string' ? body.agent_name.trim() : ''
+    const purpose = typeof body.agent_purpose === 'string' ? body.agent_purpose.trim() : ''
+    const language = body.agent_language ?? 'auto'
+    if (name.length > 80 || purpose.length > 240 || !['auto', 'English', 'Hindi', 'Hinglish'].includes(language)) {
+      return bad('Check the agent name, purpose and language.')
+    }
+    const criteriaProvided = 'qualification_criteria' in body
+    const criteria = typeof body.qualification_criteria === 'string' ? body.qualification_criteria.trim() : ''
+    if (criteria.length > 4000) return bad('Use up to 4,000 characters for qualification criteria.')
+    const tagProvided = 'qualified_tag_id' in body
+    const tagId = typeof body.qualified_tag_id === 'string' ? body.qualified_tag_id.trim() : ''
+    if (tagId) {
+      if (!isUuid(tagId)) return bad('Choose a tag from this workspace.')
+      const { data: tag } = await supabase.from('tags').select('id').eq('account_id', accountId).eq('id', tagId).maybeSingle()
+      if (!tag) return bad('Choose a tag from this workspace.')
+    }
     const isActive = body.is_active === true
     const autoReplyEnabled = body.auto_reply_enabled === true
 
@@ -142,15 +160,16 @@ export async function POST(request: Request) {
 
     let apiKeyPlain: string
     let baseUrl: string | null = null
-    if (provider === 'openai_compatible') {
+    if (provider === 'n8n' || provider === 'openai_compatible') {
       const candidate = baseUrlProvided
         ? requestedBaseUrl
-        : existing?.provider === 'openai_compatible'
+        : existing?.provider === provider
           ? (existing.base_url ?? '').trim()
           : ''
       if (!candidate) return bad(t('ai.baseUrlRequired'))
       try {
-        normalizeOpenAiCompatibleBaseUrl(candidate)
+        if (provider === 'n8n') normalizeN8nUrl(candidate)
+        else normalizeOpenAiCompatibleBaseUrl(candidate)
       } catch (err) {
         return bad(err instanceof AiError ? err.message : t('ai.baseUrlInvalid'))
       }
@@ -235,6 +254,12 @@ export async function POST(request: Request) {
     // Only touch the handoff target when the form actually sent the field,
     // so a partial save (e.g. flipping a toggle) doesn't wipe it.
     if (handoffProvided) shared.handoff_agent_id = handoffAgentId
+    if ('agent_name' in body) shared.agent_name = name || null
+    if ('agent_purpose' in body) shared.agent_purpose = purpose || null
+    if ('agent_language' in body) shared.agent_language = language
+    if (criteriaProvided) shared.qualification_criteria = criteria || null
+    if (tagProvided) shared.qualified_tag_id = tagId || null
+    if ('apply_qualified_status' in body) shared.apply_qualified_status = body.apply_qualified_status === true
     if (rawEmbeddingsKey) {
       shared.embeddings_api_key = encrypt(rawEmbeddingsKey)
     } else if (clearEmbeddingsKey) {

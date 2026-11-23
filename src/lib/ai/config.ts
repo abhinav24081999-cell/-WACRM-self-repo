@@ -3,7 +3,7 @@ import { decrypt } from '@/lib/whatsapp/encryption'
 import type { AiConfig } from './types'
 
 interface AiConfigRow {
-  provider: 'openai' | 'anthropic' | 'openai_compatible'
+  provider: AiConfig['provider']
   model: string
   base_url: string | null
   api_key: string
@@ -13,10 +13,13 @@ interface AiConfigRow {
   auto_reply_max_per_conversation: number
   handoff_agent_id: string | null
   embeddings_api_key: string | null
+  qualification_criteria?: string | null
+  agent_purpose?: string | null
+  agent_language?: string | null
 }
 
 const CONFIG_COLUMNS =
-  'provider, model, base_url, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key'
+  'provider, model, base_url, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, qualification_criteria, agent_purpose, agent_language'
 
 /**
  * Load and decrypt the account's AI config for *use* (draft or
@@ -81,6 +84,9 @@ export async function loadAiConfig(
     autoReplyMaxPerConversation: row.auto_reply_max_per_conversation,
     handoffAgentId: row.handoff_agent_id,
     embeddingsApiKey,
+    qualificationCriteria: row.qualification_criteria ?? null,
+    agentPurpose: row.agent_purpose,
+    agentLanguage: row.agent_language,
   }
 }
 
