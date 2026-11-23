@@ -20,8 +20,11 @@ export async function POST(request: Request) {
     if (raw === null) return new Response(null, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(raw); } catch { return new Response(null, { status: 400 }); }
-    const byContact = typeof body === "object" && body !== null && "contactIds" in body;
-    const ids = byContact ? body.contactIds : body;
+    const contactRequest = typeof body === "object" && body !== null && "contactIds" in body
+      ? body
+      : undefined;
+    const byContact = Boolean(contactRequest);
+    const ids = contactRequest ? contactRequest.contactIds : body;
     if (!Array.isArray(ids) || !ids.length || ids.length > INBOX_LABEL_BATCH ||
       !ids.every(id => typeof id === "string" && uuid.test(id))) {
       return new Response(null, { status: 400 });
