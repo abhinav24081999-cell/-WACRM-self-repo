@@ -55,6 +55,10 @@ export function conversionTarget(source: string) {
   return source === 'google_lead_form' || source === 'website_form' ? googleAccount() : metaConfig(source).dataset
 }
 
+export function messagingConversionAccount(source: string) {
+  return isMessagingConversion(source) ? metaConfig(source).businessAccount : undefined
+}
+
 export function configuredSources() {
   const ready = Object.keys(metaRoutes).filter(source => {
     const { dataset, token, businessAccount } = metaConfig(source)

@@ -332,6 +332,35 @@
     "page": {
       "whatsappNotConnected": "O WhatsApp® não está conectado. Vá em Configurações para conectar sua conta."
     },
+    "conversationLabels": {
+      "metaStatus": "Status da Meta",
+      "tags": "Etiquetas do contato",
+      "viewTags": "Ver {count} etiquetas do contato",
+      "conversionStatus": "Status da API de conversões",
+      "viewCapi": "Ver status da API de conversões: {status}",
+      "receiptHint": "Aceito significa que a Meta recebeu o evento. A atribuição é verificada na Meta.",
+      "notSentHint": "A etapa de qualificação foi atingida e está pronta para entrar na fila.",
+      "testStatus": "Teste: {status}",
+      "attempts": "{count} tentativas",
+      "sentAt": "Enviado {date}",
+      "status": {
+        "accepted": "Aceito",
+        "pending": "Pendente",
+        "sending": "Enviando",
+        "failed": "Falhou",
+        "retrying": "Tentando novamente",
+        "skipped": "Ignorado",
+        "tested": "Testado",
+        "needs_review": "Requer revisão",
+        "not_sent": "Não enviado"
+      },
+      "issue": {
+        "credentials": "Verifique a conexão ou as credenciais da Meta.",
+        "identifiers": "Confira os identificadores da Meta do lead.",
+        "uncertain": "Não foi possível confirmar a entrega à Meta.",
+        "delivery": "Revise o evento no histórico de conversões."
+      }
+    },
     "conversationList": {
       "channelFilter": "Canal",
       "allChannels": "Todos os canais",
