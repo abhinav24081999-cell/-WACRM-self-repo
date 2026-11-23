@@ -509,12 +509,12 @@ export function ContactDetailView({
                 </Button>
               </SheetHeader>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-2.5">
                 <Accordion
                   key={contact.id}
                   defaultValue={['details']}
                   multiple
-                  className="gap-2 motion-reduce:[&_[data-slot=accordion-content]]:animate-none"
+                  className="gap-1.5 motion-reduce:[&_[data-slot=accordion-content]]:animate-none"
                 >
                   <ContactSection
                     value="details"
@@ -529,9 +529,9 @@ export function ContactDetailView({
                         event.preventDefault();
                         if (!savingDetails) void saveDetails();
                       }}
-                      className="space-y-2.5"
+                      className="space-y-1.5"
                     >
-                      <div className="space-y-1.5">
+                      <div className="grid gap-1">
                         <Label
                           htmlFor={`${detailsFormId}-name`}
                           className="text-muted-foreground text-[0.8125rem]"
@@ -543,10 +543,10 @@ export function ContactDetailView({
                           autoComplete="name"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="bg-background/30 h-9"
+                          className="bg-background/30 h-9 md:h-8.5"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="grid gap-1">
                         <Label
                           htmlFor={`${detailsFormId}-phone`}
                           className="text-muted-foreground text-[0.8125rem]"
@@ -566,10 +566,10 @@ export function ContactDetailView({
                           aria-required="true"
                           value={editPhone}
                           onChange={(e) => setEditPhone(e.target.value)}
-                          className="bg-background/30 h-9"
+                          className="bg-background/30 h-9 md:h-8.5"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="grid gap-1">
                         <Label
                           htmlFor={`${detailsFormId}-email`}
                           className="text-muted-foreground text-[0.8125rem]"
@@ -582,10 +582,10 @@ export function ContactDetailView({
                           autoComplete="email"
                           value={editEmail}
                           onChange={(e) => setEditEmail(e.target.value)}
-                          className="bg-background/30 h-9"
+                          className="bg-background/30 h-9 md:h-8.5"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="grid gap-1">
                         <Label
                           htmlFor={`${detailsFormId}-company`}
                           className="text-muted-foreground text-[0.8125rem]"
@@ -597,7 +597,7 @@ export function ContactDetailView({
                           autoComplete="organization"
                           value={editCompany}
                           onChange={(e) => setEditCompany(e.target.value)}
-                          className="bg-background/30 h-9"
+                          className="bg-background/30 h-9 md:h-8.5"
                         />
                       </div>
                     </form>
