@@ -45,6 +45,18 @@ describe('Meta Instant Form webhook', () => {
     expect(rpc).not.toHaveBeenCalled()
   })
 
+  it('can verify the callback before lead delivery credentials are configured', async () => {
+    const verification = new URL(base)
+    verification.search = 'hub.mode=subscribe&hub.challenge=hello&hub.verify_token=test-verification'
+    vi.stubEnv('META_LEAD_PAGE_ACCESS_TOKEN', '')
+    vi.stubEnv('META_LEAD_APP_SECRET', '')
+    expect(await GET(new Request(verification)).text()).toBe('hello')
+    expect((await POST(delivery())).status).toBe(503)
+    vi.stubEnv('META_LEAD_PAGE_ID', '')
+    expect(GET(new Request(verification)).status).toBe(403)
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
   it('keeps long IDs exact, adds contact and ad data, and acknowledges a replay', async () => {
     const fetchGraph = vi.fn().mockResolvedValueOnce(Response.json({ id: leadId, platform: 'ig', field_data: [
       { name: 'full_name', values: ['Preview Lead'] }, { name: 'phone_number', values: ['+91 99900 00001'] },

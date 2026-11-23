@@ -1,7 +1,8 @@
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
-import { configuredSources, feedbackWorkspace, liveFeedbackEnabled } from '@/lib/conversions/providers'
+import { configuredSources, feedbackWorkspace, liveFeedbackEnabled, metaTestCode } from '@/lib/conversions/providers'
 import { runConversionQueue } from '@/lib/conversions/worker'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
+import { formConnection, formVerificationToken } from '@/lib/meta/lead-ads'
 import { readCappedBody } from '@/lib/whatsapp/webhook-body'
 
 export const maxDuration = 60
@@ -11,7 +12,15 @@ export async function GET() {
   try {
     const { accountId } = await requireRole('admin')
     const available = feedbackWorkspace() === accountId
-    return Response.json({ available, sources: available ? configuredSources() : [], live: available && liveFeedbackEnabled() })
+    const sources = available ? configuredSources() : []
+    return Response.json({
+      available, sources, live: available && liveFeedbackEnabled(),
+      metaTestSources: sources.filter(source => Boolean(metaTestCode(source))),
+      metaIntake: {
+        callbackConfigured: Boolean(formVerificationToken(accountId)),
+        deliveryConfigured: formConnection()?.workspaceId === accountId,
+      },
+    }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     return toErrorResponse(error)
   }
