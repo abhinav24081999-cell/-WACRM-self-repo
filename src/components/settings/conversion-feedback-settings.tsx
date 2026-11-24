@@ -15,7 +15,11 @@ type Stage = 'new' | 'qualified' | 'converted';
 type Delivery = 'manual' | 'automatic' | 'off';
 type Rule = { source: Source; stage: Stage; destination: string; delivery: Delivery; test_mode: boolean };
 type Event = Omit<Rule, 'delivery'> & { id: string; event_time: string; state: string; attempts: number; reason: string | null; response_id: string | null; provider_target: string | null; http_status: number | null; sent_at: string | null };
-type Connection = { available: boolean; sources: Source[]; live: boolean };
+type Connection = {
+  available: boolean; sources: Source[]; live: boolean;
+  metaTestSources: Source[];
+  metaIntake: { callbackConfigured: boolean; deliveryConfigured: boolean };
+};
 
 const initialRule: Rule = { source: 'meta_instant_form', stage: 'qualified', destination: '', delivery: 'manual', test_mode: true };
 const selectClass = 'h-8 w-full rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-ring';
@@ -127,6 +131,11 @@ export function ConversionFeedbackSettings() {
         {connection?.sources.length ? <p className="text-sm">{t('configured', {
           sources: format.list(connection.sources.map(source => lead(`sources.${source}`)), { type: 'conjunction' }),
         })}</p> : <p className="text-sm text-muted-foreground">{t('connectionNeeded')}</p>}
+        {connection?.metaIntake && <ul className="space-y-1 text-sm text-muted-foreground">
+          <li>Meta Page webhook verification token {connection.metaIntake.callbackConfigured ? 'configured' : 'needed'}</li>
+          <li>Meta form delivery credentials {connection.metaIntake.deliveryConfigured ? 'configured' : 'needed'}</li>
+          <li>Meta Instant Forms CAPI {connection.metaTestSources.includes('meta_instant_form') ? 'configured for Test Events' : 'needs a dataset, token and Test Events code'}</li>
+        </ul>}
         {loadError && <p role="alert" className="text-sm text-destructive">{t('loadError')}</p>}
         <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">

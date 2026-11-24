@@ -12,14 +12,24 @@ export function adsTokenFor(workspaceId: string) {
     : undefined
 }
 
-export function formConnection() {
+function formTarget() {
   const workspaceId = metaLeadWorkspace()
   const pageId = metaId(process.env.META_LEAD_PAGE_ID?.trim())
+  return workspaceId && pageId ? { workspaceId, pageId } : null
+}
+
+export function formVerificationToken(accountId?: string) {
+  const target = formTarget()
+  if (!target || (accountId && target.workspaceId !== accountId)) return undefined
+  return process.env.META_LEAD_VERIFY_TOKEN?.trim() || undefined
+}
+
+export function formConnection() {
+  const target = formTarget()
   const accessToken = process.env.META_LEAD_PAGE_ACCESS_TOKEN?.trim()
   const appSecret = process.env.META_LEAD_APP_SECRET?.trim()
-  const verifyToken = process.env.META_LEAD_VERIFY_TOKEN?.trim()
-  if (!workspaceId || !pageId || !accessToken || !appSecret || !verifyToken) return null
-  return { workspaceId, pageId, accessToken, appSecret, verifyToken }
+  if (!target || !accessToken || !appSecret) return null
+  return { ...target, accessToken, appSecret }
 }
 
 function providerTime(value: unknown) {

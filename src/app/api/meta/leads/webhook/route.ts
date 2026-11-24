@@ -1,4 +1,4 @@
-import { captureFormLeads, formConnection, readFormEvents } from '@/lib/meta/lead-ads'
+import { captureFormLeads, formConnection, formVerificationToken, readFormEvents } from '@/lib/meta/lead-ads'
 import { validSignature } from '@/lib/social/meta'
 import { readCappedBody } from '@/lib/whatsapp/webhook-body'
 import { verifyTokenMatches } from '@/lib/whatsapp/webhook-signature'
@@ -6,12 +6,12 @@ import { verifyTokenMatches } from '@/lib/whatsapp/webhook-signature'
 export const maxDuration = 60
 
 export function GET(request: Request) {
-  const connection = formConnection()
+  const verifyToken = formVerificationToken()
   const query = new URL(request.url).searchParams
   const token = query.get('hub.verify_token')
   const challenge = query.get('hub.challenge')
-  if (!connection || !token || !challenge || query.get('hub.mode') !== 'subscribe' ||
-      !verifyTokenMatches(connection.verifyToken, token)) return new Response(null, { status: 403 })
+  if (!verifyToken || !token || !challenge || query.get('hub.mode') !== 'subscribe' ||
+      !verifyTokenMatches(verifyToken, token)) return new Response(null, { status: 403 })
   return new Response(challenge)
 }
 
