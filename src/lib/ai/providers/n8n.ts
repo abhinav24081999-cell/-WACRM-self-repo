@@ -38,28 +38,33 @@ export async function generateN8n(
     );
   }
 
+  const body = JSON.stringify({
+    version: 1,
+    correlation_id: id,
+    mode,
+    instructions: args.systemPrompt,
+    messages: args.messages.map((message) => ({
+      ...message,
+      content: message.content.slice(0, 4000),
+    })),
+  });
+  const send = async (timeout: number, attempt: number) => {
+    const result = await postWebhook(url, {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: 'Bearer ' + args.apiKey,
+    }, body, timeout, true);
+    console.info('[ai/n8n] workflow response', { correlation_id: id, mode, attempt, status: result.status });
+    return result;
+  };
+  const timeout = Math.min(args.timeoutMs, 20_000);
+  const deadline = Date.now() + timeout;
   let response;
   try {
-    response = await postWebhook(
-      url,
-      {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: 'Bearer ' + args.apiKey,
-      },
-      JSON.stringify({
-        version: 1,
-        correlation_id: id,
-        mode,
-        instructions: args.systemPrompt,
-        messages: args.messages.map((message) => ({
-          ...message,
-          content: message.content.slice(0, 4000),
-        })),
-      }),
-      Math.min(args.timeoutMs, 20_000),
-      true
-    );
+    response = await send(timeout, 1);
+    if ([502, 503, 504].includes(response.status) && deadline - Date.now() > 1000) {
+      response = await send(deadline - Date.now(), 2);
+    }
   } catch (error) {
     if (error instanceof BlockedWebhookDestination) {
       throw new AiError('The workflow must use a public HTTPS URL.', {
@@ -67,6 +72,7 @@ export async function generateN8n(
         status: 400,
       });
     }
+    console.warn('[ai/n8n] workflow delivery unavailable', { correlation_id: id, mode });
     throw new AiError(
       'The workflow was unreachable, timed out, or returned too much data.',
       { code: 'workflow_unavailable' }

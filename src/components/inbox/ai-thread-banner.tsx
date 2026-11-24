@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Sparkles, Hand, Undo2, Loader2 } from "lucide-react";
+import { Sparkles, Hand, Pause, Undo2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
 import { fetchAiAccountStatus } from "@/lib/ai/account-status-cache";
+import type { InboxChannel } from "@/lib/social/channels";
 
 interface AiThreadBannerProps {
   conversationId: string;
+  channel?: InboxChannel;
   /** `conversations.ai_autoreply_disabled` — bot paused on this thread. */
   disabled: boolean;
   /** `conversations.ai_handoff_summary` — note the bot left on handoff. */
@@ -38,6 +40,7 @@ interface AiThreadBannerProps {
  */
 export function AiThreadBanner({
   conversationId,
+  channel = "whatsapp",
   disabled,
   handoffSummary,
   assignedAgentId,
@@ -46,7 +49,7 @@ export function AiThreadBanner({
 }: AiThreadBannerProps) {
   const t = useTranslations("Inbox.aiBanner");
   const { accountId } = useAuth();
-  const [autoReplyOn, setAutoReplyOn] = useState<boolean | null>(null);
+  const [responder, setResponder] = useState<"built-in" | "n8n" | null>(null);
   const [busy, setBusy] = useState(false);
   // Optimistic local mirror of the pause flag so the banner flips
   // instantly on click; re-seeds whenever the thread (or its server
@@ -57,21 +60,24 @@ export function AiThreadBanner({
   useEffect(() => {
     if (!accountId) return;
     let alive = true;
-    fetchAiAccountStatus(accountId).then((s) => alive && setAutoReplyOn(s.autoReplyOn));
+    fetchAiAccountStatus(accountId).then((s) => {
+      if (!alive) return;
+      const enabled = s.autoReplyOn && (s.channels ?? ["whatsapp"]).includes(channel);
+      setResponder(enabled ? (s.external ? "n8n" : "built-in") : null);
+    });
     return () => {
       alive = false;
     };
-  }, [accountId]);
+  }, [accountId, channel]);
 
   const toggle = useCallback(
-    async (paused: boolean) => {
+    async (paused: boolean, takeOver = false) => {
       setBusy(true);
       try {
         const res = await fetch(`/api/ai/autoreply/${conversationId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // "Take over" also assigns the thread to the acting agent.
-          body: JSON.stringify({ paused, assign_to_me: paused }),
+          body: JSON.stringify({ paused, assign_to_me: takeOver }),
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
@@ -85,12 +91,12 @@ export function AiThreadBanner({
           // the caller's own assignment. The realtime UPDATE reconciles
           // the exact value either way.
           ...(paused
-            ? currentUserId
+            ? takeOver && currentUserId
               ? { assigned_agent_id: currentUserId }
               : {}
             : { assigned_agent_id: null }),
         });
-        toast.success(paused ? t("tookOver") : t("resumed"));
+        toast.success(t(paused ? (takeOver ? "tookOver" : "pausedTitle") : "resumed"));
       } catch {
         toast.error(t("networkError"));
       } finally {
@@ -101,14 +107,14 @@ export function AiThreadBanner({
   );
 
   // Account has no auto-reply → nothing to show. (Still loading → nothing.)
-  if (!autoReplyOn) return null;
+  if (!responder) return null;
 
   // Paused here (a human took over, or the model handed off).
-  if (paused) {
+  if (paused || assignedAgentId) {
     return (
       <Banner tone="muted">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-foreground">{t("pausedTitle")}</p>
+          <p className="font-medium text-foreground">{t(assignedAgentId ? "humanActive" : "pausedTitle")}</p>
           {handoffSummary && (
             <p className="truncate text-muted-foreground" title={handoffSummary}>
               {handoffSummary}
@@ -122,21 +128,23 @@ export function AiThreadBanner({
     );
   }
 
-  // Active, but a human already owns it → the bot won't fire; no banner.
-  if (assignedAgentId) return null;
-
   // Active on this thread.
   return (
     <Banner tone="primary">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
         <span className="truncate font-medium text-foreground">
-          {t("activeText")}
+          {t(responder === "n8n" ? "externalActive" : "activeText")}
         </span>
       </div>
-      <BannerButton onClick={() => toggle(true)} busy={busy} icon={Hand}>
-        {t("takeOver")}
-      </BannerButton>
+      <div className="flex flex-wrap gap-2">
+        <BannerButton onClick={() => toggle(true)} busy={busy} icon={Pause}>
+          {t("pause")}
+        </BannerButton>
+        <BannerButton onClick={() => toggle(true, true)} busy={busy} icon={Hand}>
+          {t("takeOver")}
+        </BannerButton>
+      </div>
     </Banner>
   );
 }

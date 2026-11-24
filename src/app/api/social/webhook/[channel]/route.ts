@@ -1,6 +1,8 @@
+import { after } from 'next/server'
+import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { isSocialChannel } from '@/lib/social/channels'
-import { connectionFor, fetchContactName, readAdReferrals, readMessages, socialLeadArgs, validSignature } from '@/lib/social/meta'
+import { canReplyAt, connectionFor, fetchContactName, readAdReferrals, readMessages, socialLeadArgs, validSignature } from '@/lib/social/meta'
 import { verifyTokenMatches } from '@/lib/whatsapp/webhook-signature'
 import { adsTokenFor, captureFormLeads, formConnection, metaLeadWorkspace, readFormEvents } from '@/lib/meta/lead-ads'
 import { readCappedBody } from '@/lib/whatsapp/webhook-body'
@@ -36,16 +38,20 @@ export async function POST(request: Request, { params }: Context) {
   try {
     const db = supabaseAdmin()
     const payload = JSON.parse(raw)
+    const inboundForAi: Parameters<typeof dispatchInboundToAiReply>[0][] = []
     for (const message of readMessages(payload, channel, connection.accountId)) {
       let contactName: string | null = null
+      const lookupThread = () => db.from('conversations').select('id, contact_id, user_id')
+        .eq('account_id', connection.workspaceId)
+        .eq('channel', channel)
+        .eq('channel_account_id', connection.accountId)
+        .eq('channel_sender_id', message.senderId)
+        .maybeSingle()
+      let thread = null
       if (!message.outgoing) {
-        const { data, error } = await db.from('conversations').select('id')
-          .eq('account_id', connection.workspaceId)
-          .eq('channel', channel)
-          .eq('channel_account_id', connection.accountId)
-          .eq('channel_sender_id', message.senderId)
-          .maybeSingle()
+        const { data, error } = await lookupThread()
         if (error) throw error
+        thread = data
         if (!data) {
           contactName = await fetchContactName(channel, connection.accessToken, message.senderId, message.messageId)
         }
@@ -65,6 +71,23 @@ export async function POST(request: Request, { params }: Context) {
         p_contact_name: contactName,
       })
       if (error) throw error
+
+      if (!message.outgoing && canReplyAt(message.sentAt) && message.text.trim() &&
+          message.text !== '[Attachment]' && message.text !== '[Unsupported message]') {
+        if (!thread) {
+          const result = await lookupThread()
+          if (result.error) throw result.error
+          thread = result.data
+        }
+        if (thread) inboundForAi.push({
+          accountId: connection.workspaceId,
+          conversationId: thread.id,
+          contactId: thread.contact_id,
+          configOwnerUserId: thread.user_id,
+          inboundMessageId: `${channel}:${message.messageId}`,
+          channel,
+        })
+      }
     }
     if (connection.workspaceId === metaLeadWorkspace()) {
       for (const referral of readAdReferrals(payload, channel, connection.accountId).values()) {
@@ -79,6 +102,9 @@ export async function POST(request: Request, { params }: Context) {
       const events = readFormEvents(raw, forms.pageId)
       if (events.size && !await captureFormLeads(events, forms)) return new Response(null, { status: 503 })
     }
+    if (inboundForAi.length) after(async () => {
+      await Promise.all(inboundForAi.map((inbound) => dispatchInboundToAiReply(inbound)))
+    })
   } catch (error) {
     console.error('[social] Unable to persist webhook delivery', {
       channel,

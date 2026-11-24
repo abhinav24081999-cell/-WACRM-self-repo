@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   engineSendText: vi.fn(),
   loadAccountMetaCredentials: vi.fn(),
   sendTypingIndicator: vi.fn(),
+  sendSocialAiReply: vi.fn(),
   state: {
     conv: null as Record<string, unknown> | null,
     autoResponders: [] as { id: string }[],
@@ -17,6 +18,7 @@ const h = vi.hoisted(() => ({
     updatePayload: null as Record<string, unknown> | null,
     updates: [] as { payload: Record<string, unknown>; isNull: string[] }[],
     rpcCalls: [] as { name: string; args: unknown }[],
+    started: false,
     latestInbound: [] as { message_id: string }[],
   },
 }))
@@ -32,6 +34,7 @@ vi.mock('@/lib/flows/meta-send', () => ({
 vi.mock('@/lib/whatsapp/meta-api', () => ({
   sendTypingIndicator: h.sendTypingIndicator,
 }))
+vi.mock('@/lib/social/ai-reply', () => ({ sendSocialAiReply: h.sendSocialAiReply }))
 vi.mock('./admin-client', () => ({
   supabaseAdmin: () => ({
     from: (table: string) => {
@@ -46,24 +49,11 @@ vi.mock('./admin-client', () => ({
         }
         return chain
       }
-      if (table === 'messages') {
-        const chain = {
-          select: () => chain,
-          eq: () => chain,
-          order: () => chain,
-          limit: () =>
-            Promise.resolve({ data: h.state.latestInbound, error: null }),
-        }
-        return chain
-      }
       // conversations
-      return {
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () =>
-              Promise.resolve({ data: h.state.conv, error: null }),
-          }),
-        }),
+      const conversation = {
+        select: () => conversation,
+        eq: () => conversation,
+        maybeSingle: () => Promise.resolve({ data: h.state.conv, error: null }),
         update: (payload: Record<string, unknown>) => {
           h.state.updatePayload = { ...h.state.updatePayload, ...payload }
           const record = { payload, isNull: [] as string[] }
@@ -78,8 +68,14 @@ vi.mock('./admin-client', () => ({
           return { eq: () => filter }
         },
       }
+      return conversation
     },
-    rpc: (name: string, args: unknown) => {
+    rpc: (name: string, args: { p_message_id?: string }) => {
+      if (name === 'begin_inbound_ai_reply') {
+        const acquired = !h.state.started && args.p_message_id === h.state.latestInbound[0]?.message_id
+        if (acquired) h.state.started = true
+        return Promise.resolve({ data: acquired, error: null })
+      }
       h.state.rpcCalls.push({ name, args })
       return Promise.resolve({ data: h.state.claim, error: null })
     },
@@ -123,6 +119,7 @@ beforeEach(() => {
   h.state.updatePayload = null
   h.state.updates = []
   h.state.rpcCalls = []
+  h.state.started = false
   h.state.latestInbound = [{ message_id: 'wamid.inbound-1' }]
   h.loadAiConfig.mockResolvedValue(aiConfig())
   h.buildConversationContext.mockResolvedValue([{ role: 'user', content: 'hi' }])
@@ -141,8 +138,11 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     await dispatchInboundToAiReply(ARGS)
     expect(h.state.rpcCalls).toEqual([
       {
-        name: 'claim_ai_reply_slot',
-        args: { conversation_id: 'conv-1', max_replies: 3 },
+        name: 'claim_inbound_ai_reply',
+        args: {
+          p_account_id: 'acct-1', p_conversation_id: 'conv-1',
+          p_message_id: 'wamid.inbound-1', p_max_replies: 3, p_sends_reply: true,
+        },
       },
     ])
     expect(h.engineSendText).toHaveBeenCalledWith(
@@ -156,6 +156,30 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(h.retrieveKnowledge).toHaveBeenCalled()
     const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
     expect(systemPrompt).toContain('Returns accepted within 30 days.')
+  })
+
+  it('sends an enabled Instagram reply through its own channel and skips WhatsApp typing', async () => {
+    h.state.latestInbound = [{ message_id: 'instagram:mid-1' }]
+    h.loadAiConfig.mockResolvedValue(aiConfig({ provider: 'n8n', autoReplyChannels: ['instagram'] }))
+    await dispatchInboundToAiReply({ ...ARGS, channel: 'instagram', inboundMessageId: 'instagram:mid-1' })
+    expect(h.sendSocialAiReply).toHaveBeenCalledWith(expect.anything(), 'acct-1', 'conv-1', 'instagram', 'Hello!')
+    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.sendTypingIndicator).not.toHaveBeenCalled()
+  })
+
+  it('starts one n8n execution when duplicate Instagram deliveries run together', async () => {
+    h.state.latestInbound = [{ message_id: 'instagram:mid-1' }]
+    h.loadAiConfig.mockResolvedValue(aiConfig({ provider: 'n8n', autoReplyChannels: ['instagram'] }))
+    const inbound = { ...ARGS, channel: 'instagram' as const, inboundMessageId: 'instagram:mid-1' }
+    await Promise.all([dispatchInboundToAiReply(inbound), dispatchInboundToAiReply(inbound)])
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    expect(h.sendSocialAiReply).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not generate a reply for an unselected channel', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyChannels: ['whatsapp'] }))
+    await dispatchInboundToAiReply({ ...ARGS, channel: 'instagram' })
+    expect(h.generateReply).not.toHaveBeenCalled()
   })
 
   it('stands down when an active message-level automation exists', async () => {
@@ -193,6 +217,14 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     h.state.latestInbound = [{ message_id: 'wamid.inbound-1' }]
     await dispatchInboundToAiReply(ARGS)
     expect(h.engineSendText).toHaveBeenCalledTimes(1)
+  })
+
+  it('discards a Gemini reply generated while the workspace switched to n8n', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ provider: 'n8n' }))
+    h.loadAiConfig.mockResolvedValueOnce(aiConfig({ provider: 'gemini' }))
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.rpcCalls).toHaveLength(0)
+    expect(h.engineSendText).not.toHaveBeenCalled()
   })
 
   it('skips when AI is off / not configured', async () => {
@@ -313,11 +345,20 @@ describe('dispatchInboundToAiReply — typing indicator (#527)', () => {
 })
 
 describe('dispatchInboundToAiReply — handoff', () => {
+  it('keeps a newer customer message from being preempted by an old handoff', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: true })
+    h.state.latestInbound = [{ message_id: 'wamid.inbound-2' }]
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.updates).toHaveLength(0)
+  })
+
   it('disables auto-reply, writes a summary, and does not send on handoff', async () => {
     h.generateReply.mockResolvedValue({ text: '', handoff: true })
     await dispatchInboundToAiReply(ARGS)
     expect(h.engineSendText).not.toHaveBeenCalled()
-    expect(h.state.rpcCalls).toHaveLength(0)
+    expect(h.state.rpcCalls[0]).toMatchObject({
+      name: 'claim_inbound_ai_reply', args: { p_sends_reply: false },
+    })
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(h.state.updatePayload?.ai_handoff_summary).toContain(
       'AI agent handed off',

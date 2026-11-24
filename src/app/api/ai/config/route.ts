@@ -14,11 +14,23 @@ import { normalizeN8nUrl, N8N_MODEL } from '@/lib/ai/providers/n8n'
 import { normalizeOpenAiCompatibleBaseUrl } from '@/lib/ai/providers/openai-compatible'
 import { canReuseStoredAiKey } from '@/lib/ai/stored-key'
 import { getT } from '@/lib/i18n/translate'
+import { isInboxChannel } from '@/lib/social/channels'
 
 const t = getT('Api')
 
 function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 })
+}
+
+function databaseError(operation: string, code: string, fallback: string) {
+  console.error(`[ai/config] ${operation} failed`, { code })
+  if (['42703', '42P01', 'PGRST204', 'PGRST205'].includes(code)) {
+    return NextResponse.json(
+      { error: t('ai.configSchemaNotReady'), code: 'ai_schema_not_ready' },
+      { status: 503 },
+    )
+  }
+  return NextResponse.json({ error: fallback }, { status: 500 })
 }
 
 /**
@@ -37,18 +49,12 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key, qualification_criteria, apply_qualified_status, qualified_tag_id, agent_name, agent_purpose, agent_language',
+        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_channels, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key, qualification_criteria, apply_qualified_status, qualified_tag_id, agent_name, agent_purpose, agent_language',
       )
       .eq('account_id', accountId)
       .maybeSingle()
 
-    if (error) {
-      console.error('[ai/config GET] fetch error:', error)
-      return NextResponse.json(
-        { error: t('ai.loadConfigFailed') },
-        { status: 500 },
-      )
-    }
+    if (error) return databaseError('load', error.code, t('ai.loadConfigFailed'))
 
     if (!data) return NextResponse.json({ configured: false })
     // The keys are selected only to derive the has_* flags; neither is
@@ -116,6 +122,10 @@ export async function POST(request: Request) {
     }
     const isActive = body.is_active === true
     const autoReplyEnabled = body.auto_reply_enabled === true
+    const channels = body.auto_reply_channels
+    if (channels !== undefined && (!Array.isArray(channels) || !channels.every(isInboxChannel))) {
+      return bad(t('ai.configInvalidChannels'))
+    }
 
     let maxPer = Number(body.auto_reply_max_per_conversation)
     if (!Number.isFinite(maxPer)) maxPer = 3
@@ -152,11 +162,12 @@ export async function POST(request: Request) {
     const clearEmbeddingsKey = body.embeddings_api_key === null
 
     // Reuse the stored key when the form didn't send a fresh one.
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('ai_configs')
       .select('id, provider, model, base_url, api_key')
       .eq('account_id', accountId)
       .maybeSingle()
+    if (existingError) return databaseError('read before save', existingError.code, t('ai.saveConfigFailed'))
 
     let apiKeyPlain: string
     let baseUrl: string | null = null
@@ -254,6 +265,7 @@ export async function POST(request: Request) {
     // Only touch the handoff target when the form actually sent the field,
     // so a partial save (e.g. flipping a toggle) doesn't wipe it.
     if (handoffProvided) shared.handoff_agent_id = handoffAgentId
+    if (channels !== undefined) shared.auto_reply_channels = [...new Set(channels)]
     if ('agent_name' in body) shared.agent_name = name || null
     if ('agent_purpose' in body) shared.agent_purpose = purpose || null
     if ('agent_language' in body) shared.agent_language = language
@@ -271,13 +283,7 @@ export async function POST(request: Request) {
         .from('ai_configs')
         .update(encryptedKey ? { ...shared, api_key: encryptedKey } : shared)
         .eq('account_id', accountId)
-      if (upErr) {
-        console.error('[ai/config POST] update error:', upErr)
-        return NextResponse.json(
-          { error: t('ai.saveConfigFailed') },
-          { status: 500 },
-        )
-      }
+      if (upErr) return databaseError('update', upErr.code, t('ai.saveConfigFailed'))
     } else {
       const { error: insErr } = await supabase.from('ai_configs').insert({
         account_id: accountId,
@@ -285,13 +291,7 @@ export async function POST(request: Request) {
         api_key: encryptedKey, // guaranteed non-null: rawKey required when no existing row
         ...shared,
       })
-      if (insErr) {
-        console.error('[ai/config POST] insert error:', insErr)
-        return NextResponse.json(
-          { error: t('ai.saveConfigFailed') },
-          { status: 500 },
-        )
-      }
+      if (insErr) return databaseError('insert', insErr.code, t('ai.saveConfigFailed'))
     }
 
     return NextResponse.json({ success: true })
@@ -313,13 +313,7 @@ export async function DELETE() {
       .from('ai_configs')
       .delete()
       .eq('account_id', accountId)
-    if (error) {
-      console.error('[ai/config DELETE] error:', error)
-      return NextResponse.json(
-        { error: t('ai.deleteConfigFailed') },
-        { status: 500 },
-      )
-    }
+    if (error) return databaseError('delete', error.code, t('ai.deleteConfigFailed'))
     return NextResponse.json({ success: true })
   } catch (err) {
     return toErrorResponse(err)
