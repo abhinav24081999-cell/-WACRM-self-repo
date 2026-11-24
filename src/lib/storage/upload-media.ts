@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { getT } from "@/lib/i18n/translate";
+import { CHAT_MEDIA_BUCKET } from "@/lib/media/chat-storage";
 
 const t = getT("LibErrors");
 
@@ -122,7 +123,7 @@ export async function uploadAccountMedia(
 
   const path = buildMediaPath(profile.account_id as string, file.name);
   const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
-    cacheControl: "3600",
+    cacheControl: bucket === CHAT_MEDIA_BUCKET ? "0" : "3600",
     upsert: false,
     contentType: file.type,
   });
