@@ -1,5 +1,13 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "fix/audit-13-ai-provider-transport": false
+    }
+  },
   "crons": [
-    { "path": "/api/conversion-feedback/cron", "schedule": "0 2 * * *" }
+    {
+      "path": "/api/conversion-feedback/cron",
+      "schedule": "0 2 * * *"
+    }
   ]
 }
