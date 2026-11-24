@@ -69,3 +69,6 @@ jobs:
       # just the absence of an error.
       - name: Verify the resulting schema
         run: supabase db query --local --file supabase/ci/verify-schema.sql
+
+      - name: Verify AI and webhook release schema
+        run: supabase db query --local --file supabase/ci/verify-ai-webhook-schema.sql
