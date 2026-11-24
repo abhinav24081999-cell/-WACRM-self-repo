@@ -300,6 +300,17 @@ BEGIN
     RAISE EXCEPTION 'Workspace billing grants are too broad';
   END IF;
 
+  IF (
+    SELECT count(*) FROM pg_constraint
+    WHERE convalidated AND contype = 'f' AND connamespace = 'public'::regnamespace
+      AND cardinality(conkey) = 2
+      AND conname IN ('conversations_contact_id_fkey', 'deals_contact_id_fkey',
+        'deals_conversation_id_fkey', 'deals_pipeline_id_fkey',
+        'deals_stage_id_fkey', 'messages_reply_to_message_id_fkey')
+  ) <> 6 THEN
+    RAISE EXCEPTION 'Workspace or conversation relationship constraints were not validated';
+  END IF;
+
   RAISE NOTICE 'schema verification passed';
 END
 $$;

@@ -8,6 +8,7 @@ import {
   type ProviderArgs,
 } from './shared'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
+import { BlockedWebhookDestination, postWebhook } from '@/lib/webhooks/post'
 import { getT } from '@/lib/i18n/translate'
 
 const t = getT('LibErrors')
@@ -94,40 +95,42 @@ export async function generateOpenAiCompatible(
 ): Promise<ProviderResult> {
   const { apiKey, model, systemPrompt, messages, timeoutMs, baseUrl } = args
   const endpoint = normalizeOpenAiCompatibleBaseUrl(baseUrl ?? '')
-
-  let deliverable = false
-  try {
-    deliverable = await isDeliverableUrl(endpoint, {
-      allowPrivateHosts: allowedPrivateHosts(),
-    })
-  } catch {
-    deliverable = false
+  const privateHosts = allowedPrivateHosts()
+  const selfHosted = privateHosts.has(normalizeHost(new URL(endpoint).hostname))
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
   }
-
-  if (!deliverable) {
-    throw new AiError(t('ai.compatBlockedUrl', { envVar: PRIVATE_HOST_ALLOWLIST_ENV }), {
-      code: 'blocked_url',
-      status: 400,
-    })
-  }
+  const body = JSON.stringify({
+    model,
+    messages: [{ role: 'system', content: systemPrompt }, ...mergeConsecutive(messages)],
+    max_tokens: MAX_OUTPUT_TOKENS,
+  })
 
   let res: Response
   try {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      redirect: 'manual',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: systemPrompt }, ...mergeConsecutive(messages)],
-        max_tokens: MAX_OUTPUT_TOKENS,
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    })
+    if (selfHosted) {
+      if (!await isDeliverableUrl(endpoint, { allowPrivateHosts: privateHosts })) {
+        throw new BlockedWebhookDestination()
+      }
+      res = await fetch(endpoint, {
+        method: 'POST',
+        redirect: 'manual',
+        headers,
+        body,
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+    } else {
+      const result = await postWebhook(endpoint, headers, body, timeoutMs, true)
+      res = new Response(result.body || null, { status: result.status })
+    }
   } catch (err) {
+    if (err instanceof BlockedWebhookDestination) {
+      throw new AiError(t('ai.compatBlockedUrl', { envVar: PRIVATE_HOST_ALLOWLIST_ENV }), {
+        code: 'blocked_url',
+        status: 400,
+      })
+    }
     throw toNetworkError(err)
   }
 

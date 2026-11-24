@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { generateReply, parseGeneration } from './generate'
 import { AiError, type AiConfig } from './types'
+import { postWebhook } from '@/lib/webhooks/post'
+
+vi.mock('@/lib/webhooks/post', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/lib/webhooks/post')>()
+  return { ...original, postWebhook: vi.fn(original.postWebhook) }
+})
 
 function config(overrides: Partial<AiConfig> = {}): AiConfig {
   return {
@@ -197,16 +203,13 @@ describe('generateReply — Anthropic', () => {
 
 describe('generateReply — OpenAI-compatible', () => {
   it('uses the configured endpoint and max_tokens', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          choices: [{ message: { content: 'Gateway reply' } }],
-          usage: { prompt_tokens: 12, completion_tokens: 4, total_tokens: 16 },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+    vi.mocked(postWebhook).mockResolvedValueOnce({
+      status: 200,
+      body: JSON.stringify({
+        choices: [{ message: { content: 'Gateway reply' } }],
+        usage: { prompt_tokens: 12, completion_tokens: 4, total_tokens: 16 },
+      }),
+    })
 
     const result = await generateReply({
       config: config({
@@ -223,11 +226,10 @@ describe('generateReply — OpenAI-compatible', () => {
       handoff: false,
       usage: { promptTokens: 12, completionTokens: 4, totalTokens: 16 },
     })
-    const [url, opts] = fetchMock.mock.calls[0]
+    const [url, headers, body] = vi.mocked(postWebhook).mock.calls.at(-1)!
     expect(url).toBe('https://8.8.8.8/v1/chat/completions')
-    expect(opts.headers.Authorization).toBe('Bearer sk-test')
-    expect(JSON.parse(opts.body).max_tokens).toBe(1024)
-    expect(opts.redirect).toBe('manual')
+    expect(headers.Authorization).toBe('Bearer sk-test')
+    expect(JSON.parse(body).max_tokens).toBe(1024)
   })
 
   it('blocks private hosts unless the operator explicitly allow-lists them', async () => {
@@ -291,8 +293,9 @@ describe('generateReply — OpenAI-compatible', () => {
   })
 
   it('does not follow redirects', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 302 }))
+    const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
+    vi.mocked(postWebhook).mockResolvedValueOnce({ status: 302, body: '' })
 
     await expect(
       generateReply({
@@ -305,6 +308,6 @@ describe('generateReply — OpenAI-compatible', () => {
       }),
     ).rejects.toMatchObject({ code: 'provider_error' })
 
-    expect(fetchMock.mock.calls[0][1].redirect).toBe('manual')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
