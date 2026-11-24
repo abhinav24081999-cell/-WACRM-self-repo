@@ -145,6 +145,8 @@ Full walkthrough with screenshots:
 
 ## Documentation
 
+For this fork, start with the [WACRM product handbook](docs/README.md). It covers product workflows, architecture, release verification, and development-branch status.
+
 Full self-host documentation — Supabase migrations, WhatsApp Business
 API config, and production deploy — lives at
 **[wacrm.tech/docs](https://wacrm.tech/docs)**
