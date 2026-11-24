@@ -14,6 +14,7 @@ import {
   buildPage,
 } from '@/lib/api/v1/pagination';
 import { serializeMessage } from '@/lib/api/v1/conversations';
+import { CHAT_MEDIA_BUCKET, chatStoragePath, isAccountChatPath } from '@/lib/media/chat-storage';
 import type { Message } from '@/types';
 
 export async function GET(
@@ -55,10 +56,23 @@ export async function GET(
       (data ?? []) as Array<{ created_at: string; id: string }>,
       limit
     );
-    return okList(
-      items.map((m) => serializeMessage(m as unknown as Message)),
-      nextCursor
-    );
+    const messages = items.map((m) => serializeMessage(m as unknown as Message));
+    const paths = messages.map(message => chatStoragePath(message.media_url));
+    const scoped = [...new Set(paths.filter(
+      (path): path is string => path !== null && isAccountChatPath(path, ctx.accountId)
+    ))];
+    const signed = new Map<string, string>();
+    if (scoped.length > 0) {
+      const { data } = await ctx.supabase.storage.from(CHAT_MEDIA_BUCKET)
+        .createSignedUrls(scoped, 300);
+      for (const entry of data ?? []) {
+        if (entry.path && entry.signedUrl) signed.set(entry.path, entry.signedUrl);
+      }
+    }
+    return okList(messages.map((message, index) => {
+      const path = paths[index];
+      return path === null ? message : { ...message, media_url: signed.get(path) ?? null };
+    }), nextCursor);
   } catch (err) {
     return toApiErrorResponse(err);
   }

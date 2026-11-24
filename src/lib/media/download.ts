@@ -2,6 +2,7 @@ import type { Message } from "@/types";
 import { loadMediaBlob, MediaResponseError } from "./blob-cache";
 import { mediaFilename } from "./filename";
 import { getT } from "@/lib/i18n/translate";
+import { chatMediaReadUrl } from "./chat-storage";
 
 const t = getT("LibErrors");
 
@@ -20,7 +21,7 @@ const t = getT("LibErrors");
  * fallback below.
  */
 export async function downloadMediaMessage(message: Message): Promise<void> {
-  const url = message.media_url;
+  const url = chatMediaReadUrl(message.media_url);
   if (!url) throw new Error(t("media.noAttachment"));
 
   let blob: Blob;

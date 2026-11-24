@@ -212,7 +212,7 @@ export async function mirrorInboundMedia(
     // instead of erroring or orphaning a duplicate.
     const { error } = await storage.from(MIRROR_BUCKET).upload(path, buffer, {
       contentType: uploadType,
-      cacheControl: "3600",
+      cacheControl: "0",
       upsert: true,
     });
     if (error) {
