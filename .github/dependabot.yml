@@ -38,6 +38,15 @@ updates:
       - dependency-name: tailwindcss
       - dependency-name: eslint-config-next
 
+  - package-ecosystem: npm
+    directory: "/mcp-server"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+
   # GitHub Actions in .github/workflows/. Catches setup-node /
   # checkout version bumps that keep the CI matrix healthy.
   - package-ecosystem: github-actions
