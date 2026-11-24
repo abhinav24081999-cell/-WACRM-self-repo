@@ -255,15 +255,16 @@ export function MediaDocumentBubble({
   t: Translator;
 }) {
   const { downloading, download } = useMediaDownload(message, t);
+  const mediaUrl = chatMediaReadUrl(message.media_url);
 
   return (
     <div className="flex items-center gap-2">
       <a
-        href={chatMediaReadUrl(message.media_url)}
+        href={mediaUrl}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => {
-          if (!shouldDownloadDocumentClick(message.media_url, event)) return;
+          if (!shouldDownloadDocumentClick(mediaUrl, event)) return;
           event.preventDefault();
           void download();
         }}

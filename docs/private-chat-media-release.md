@@ -8,8 +8,9 @@ in message history.
 On an isolated preview, verify that both synthetic workspaces can upload,
 open, download, and play their own attachments; that the other workspace
 and a signed-out browser cannot open them; and that Meta test sends still
-accept attachments. Check any API consumers that read `media_url`: old
-public chat storage URLs intentionally stop serving files after the cutover.
+accept attachments. Conversation message API responses return short-lived
+signed links to callers with the existing message-read permission. Verify
+that integrations which keep attachment links fetch a fresh one when needed.
 
 For production, obtain approval and first deploy the compatible app code.
 Verify it can read existing attachments and send new ones with the bucket
