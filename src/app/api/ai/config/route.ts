@@ -14,6 +14,7 @@ import { normalizeN8nUrl, N8N_MODEL } from '@/lib/ai/providers/n8n'
 import { normalizeOpenAiCompatibleBaseUrl } from '@/lib/ai/providers/openai-compatible'
 import { canReuseStoredAiKey } from '@/lib/ai/stored-key'
 import { getT } from '@/lib/i18n/translate'
+import { GEMINI_AUTO_MODEL } from '@/lib/ai/defaults'
 import { isInboxChannel } from '@/lib/social/channels'
 
 const t = getT('Api')
@@ -209,9 +210,10 @@ export async function POST(request: Request) {
       model !== existing.model ||
       baseUrl !== (existing.base_url ?? null)
 
+    let savedModel = model
     if (credentialsChanged) {
       try {
-        await validateAiCredentials({
+        const testedModel = await validateAiCredentials({
           provider,
           model,
           apiKey: apiKeyPlain,
@@ -223,6 +225,7 @@ export async function POST(request: Request) {
           handoffAgentId: null,
           embeddingsApiKey: null,
         })
+        if (provider === 'gemini' && model !== GEMINI_AUTO_MODEL && testedModel) savedModel = testedModel
       } catch (err) {
         if (err instanceof AiError) {
           return NextResponse.json(
@@ -255,7 +258,7 @@ export async function POST(request: Request) {
     const encryptedKey = rawKey ? encrypt(rawKey) : null
     const shared: Record<string, unknown> = {
       provider,
-      model,
+      model: savedModel,
       base_url: baseUrl,
       system_prompt: systemPrompt,
       is_active: isActive,

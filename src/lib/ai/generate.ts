@@ -73,13 +73,15 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
       })
   }
 
-  if (!assessmentRequested) return parseGeneration(result.text, result.usage)
+  const resolvedModel = result.model ? { model: result.model } : {}
+  if (!assessmentRequested) return { ...parseGeneration(result.text, result.usage), ...resolvedModel }
   if (config.provider === 'n8n') return { ...parseGeneration(result.text, result.usage), assessment: result.assessment }
 
   try {
     const raw = JSON.parse(result.text.replace(/^```(?:json)?\s*|\s*```$/g, ''))
     if (typeof raw.reply === 'string' && typeof raw.handoff === 'boolean' && raw.reply.length <= 4096) {
       return {
+        ...resolvedModel,
         text: raw.handoff ? '' : raw.reply.trim(),
         handoff: raw.handoff,
         usage: result.usage,

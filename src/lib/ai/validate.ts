@@ -9,10 +9,11 @@ import type { AiConfig } from './types'
  * persisting a config — the same "verify before save" discipline the
  * WhatsApp config uses with Meta.
  */
-export async function validateAiCredentials(config: AiConfig): Promise<void> {
-  await generateReply({
+export async function validateAiCredentials(config: AiConfig): Promise<string | undefined> {
+  const { model } = await generateReply({
     config,
     systemPrompt: 'You are a connectivity check. Reply with the single word: OK.',
     messages: [{ role: 'user', content: 'ping' }],
   })
+  return model
 }

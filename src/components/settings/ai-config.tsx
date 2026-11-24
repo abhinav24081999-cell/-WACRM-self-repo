@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/select';
 import { SettingsPanelHead } from './settings-panel-head';
 import { AiKnowledgeCard } from './ai-knowledge';
-import { AI_PROVIDER_DEFAULT_MODEL } from '@/lib/ai/defaults';
+import { AI_PROVIDER_DEFAULT_MODEL, GEMINI_AUTO_MODEL } from '@/lib/ai/defaults';
 import type { AiProvider } from '@/lib/ai/types';
 import { createClient } from '@/lib/supabase/client';
 import type { AccountMember } from '@/types';
@@ -256,11 +256,19 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
         const models: string[] = data.models;
         const messageKey = res.ok ? 'geminiModelsLoaded' : 'geminiReplacementModels';
         setGeminiModels(models);
-        if (!models.includes(model)) setModel('');
+        if (model !== GEMINI_AUTO_MODEL && !models.includes(model)) setModel(GEMINI_AUTO_MODEL);
         setConnectionFeedback({
           ok: res.ok && models.length > 0,
           message: t(models.length ? messageKey : 'geminiNoModels'),
         });
+      } else if (res.ok && provider === 'gemini' && typeof data.model === 'string') {
+        const testedModel = data.model;
+        if (model !== GEMINI_AUTO_MODEL && model !== testedModel) setModel(testedModel);
+        setGeminiModels((models) => [...new Set([
+          ...models.filter((id) => id !== model || id === testedModel),
+          testedModel,
+        ])]);
+        setConnectionFeedback({ ok: true, message: t('geminiTestedModel', { model: testedModel }) });
       } else {
         setConnectionFeedback({
           ok: res.ok,
@@ -488,7 +496,29 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
                   </Select>
                 </div>
 
-                {provider !== 'n8n' && (
+                {provider === 'gemini' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-model">{t('model')}</Label>
+                    <Select
+                      value={model === GEMINI_AUTO_MODEL || geminiModels.includes(model) ? model : null}
+                      onValueChange={(value) => {
+                        if (value) setModel(value);
+                        setConnectionFeedback(null);
+                      }}
+                      disabled={disabled}
+                    >
+                      <SelectTrigger id="ai-model">
+                        <SelectValue>
+                          {model === GEMINI_AUTO_MODEL ? t('geminiAuto') : model || t('geminiModelPlaceholder')}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={GEMINI_AUTO_MODEL}>{t('geminiAuto')}</SelectItem>
+                        {geminiModels.map((id) => <SelectItem key={id} value={id}>{id}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : provider !== 'n8n' && (
                   <div className="space-y-2">
                     <Label htmlFor="ai-model">{t('model')}</Label>
                     <Input
@@ -498,36 +528,9 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
                         setModel(e.target.value);
                         setConnectionFeedback(null);
                       }}
-                      placeholder={
-                        provider === 'gemini'
-                          ? t('geminiModelPlaceholder')
-                          : AI_PROVIDER_DEFAULT_MODEL[provider]
-                      }
+                      placeholder={AI_PROVIDER_DEFAULT_MODEL[provider]}
                       disabled={disabled}
                     />
-                    {provider === 'gemini' && geminiModels.length > 0 && (
-                      <Select
-                        value={geminiModels.includes(model) ? model : null}
-                        onValueChange={(value) => {
-                          if (value) setModel(value);
-                          setConnectionFeedback(null);
-                        }}
-                        disabled={disabled || testing}
-                      >
-                        <SelectTrigger aria-label={t('geminiModelPlaceholder')}>
-                          <SelectValue
-                            placeholder={t('geminiModelPlaceholder')}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {geminiModels.map((id) => (
-                            <SelectItem key={id} value={id}>
-                              {id}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
                   </div>
                 )}
 

@@ -1,4 +1,5 @@
-import { aiRequestTimeoutMs, MAX_OUTPUT_TOKENS } from '../defaults';
+import { createHash } from 'node:crypto';
+import { aiRequestTimeoutMs, GEMINI_AUTO_MODEL, MAX_OUTPUT_TOKENS } from '../defaults';
 import { AiError, type ProviderResult } from '../types';
 import {
   mergeConsecutive,
@@ -9,6 +10,50 @@ import {
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const MODEL_ID = /^gemini-[a-z0-9.-]+$/;
+const UNSTABLE_MODEL = /-(?:preview|experimental|exp|latest)(?:-|$)/;
+const SPECIALIST_MODEL = /(?:audio|tts|image|embedding|live|robotics|computer-use|deep-research|omni)/;
+const MODEL_COOLDOWN_MS = 5 * 60_000;
+const MODEL_ATTEMPT_LIMIT = 4;
+const rejectedModels = new Map<string, number>();
+
+type GeminiErrorDetail = {
+  reason?: string;
+  '@type'?: string;
+  violations?: { quotaDimensions?: { model?: string }; quotaValue?: string | number }[];
+};
+
+function rejectionKey(apiKey: string, model: string): string {
+  return createHash('sha256').update(apiKey).update('\0').update(model).digest('hex');
+}
+
+function rejectModel(apiKey: string, model: string) {
+  const key = rejectionKey(apiKey, model);
+  rejectedModels.delete(key);
+  rejectedModels.set(key, Date.now() + MODEL_COOLDOWN_MS);
+  if (rejectedModels.size > 256) rejectedModels.delete(rejectedModels.keys().next().value!);
+}
+
+function isRecentlyRejected(apiKey: string, model: string): boolean {
+  return (rejectedModels.get(rejectionKey(apiKey, model)) ?? 0) > Date.now();
+}
+
+function modelGeneration(id: string) {
+  return id.match(/^gemini-(\d+(?:\.\d+)*)-/)?.[1] ?? '0';
+}
+
+function modelCapability(id: string) {
+  if (id.includes('-carbon') || id.includes('-pro')) return 4;
+  if (id.includes('-argon')) return 3;
+  if (id.includes('-neon') || /-flash(?:-|$)/.test(id) && !id.includes('-lite')) return 2;
+  return 1;
+}
+
+function compareModels(a: string, b: string) {
+  return Number(UNSTABLE_MODEL.test(a)) - Number(UNSTABLE_MODEL.test(b)) ||
+    modelGeneration(b).localeCompare(modelGeneration(a), 'en', { numeric: true }) ||
+    modelCapability(b) - modelCapability(a) ||
+    a.localeCompare(b, 'en', { numeric: true });
+}
 
 async function geminiRequest(
   path: string,
@@ -31,14 +76,15 @@ async function geminiRequest(
 
   const data = await response.json().catch(() => null);
   if (response.ok && data) return data;
+  const details: GeminiErrorDetail[] = Array.isArray(data?.error?.details) ? data.error.details : [];
 
   const invalidKey =
     response.status === 401 ||
     response.status === 403 ||
-    data?.error?.details?.some?.(
-      (detail: { reason?: string }) =>
-        detail.reason === 'API_KEY_INVALID' ||
-        detail.reason === 'API_KEY_EXPIRED'
+    details.some(
+      (detail) =>
+        detail?.reason === 'API_KEY_INVALID' ||
+        detail?.reason === 'API_KEY_EXPIRED'
     );
   if (invalidKey) {
     throw new AiError(
@@ -53,6 +99,14 @@ async function geminiRequest(
     );
   }
   if (response.status === 429) {
+    const model = path.match(/^\/models\/([^:]+):generateContent$/)?.[1];
+    if (model && details.some(detail =>
+      detail?.['@type'] === 'type.googleapis.com/google.rpc.QuotaFailure' &&
+      detail.violations?.some(violation =>
+        violation.quotaDimensions?.model?.replace(/^models\//, '') === model &&
+        (violation.quotaValue === '0' || violation.quotaValue === 0)))) {
+      throw new AiError('This Gemini model has no quota for your key.', { code: 'unsupported_model', status: 400 });
+    }
     throw new AiError(
       'Gemini quota or rate limit reached. Check your quota or try again later.',
       { code: 'rate_limited', status: 429 }
@@ -65,7 +119,10 @@ async function geminiRequest(
 }
 
 export async function listGeminiModels(apiKey: string, timeoutMs = aiRequestTimeoutMs()): Promise<string[]> {
-  const signal = AbortSignal.timeout(timeoutMs);
+  return fetchGeminiModels(apiKey, AbortSignal.timeout(timeoutMs));
+}
+
+async function fetchGeminiModels(apiKey: string, signal: AbortSignal): Promise<string[]> {
   const models = new Set<string>();
   let path = '/models?pageSize=1000';
   for (let page = 0; page < 10; page++) {
@@ -75,9 +132,8 @@ export async function listGeminiModels(apiKey: string, timeoutMs = aiRequestTime
       if (
         MODEL_ID.test(id) &&
         model.supportedGenerationMethods?.includes('generateContent') &&
-        !/(audio|tts|image|embedding|live|robotics|computer-use|deep-research)/.test(
-          id
-        )
+        !SPECIALIST_MODEL.test(id) &&
+        !isRecentlyRejected(apiKey, id)
       ) {
         models.add(id);
       }
@@ -87,23 +143,43 @@ export async function listGeminiModels(apiKey: string, timeoutMs = aiRequestTime
       '/models?pageSize=1000&pageToken=' +
       encodeURIComponent(data.nextPageToken);
   }
-  return [...models];
+  return [...models].sort(compareModels);
 }
 
 export async function generateGemini(
   args: ProviderArgs
 ): Promise<ProviderResult> {
   const model = args.model.replace(/^models\//, '');
-  if (!MODEL_ID.test(model)) {
-    throw new AiError('Choose a valid Gemini model.', {
-      code: 'unsupported_model',
-      status: 400,
-    });
+  const canTryModel = model !== GEMINI_AUTO_MODEL && MODEL_ID.test(model) && !SPECIALIST_MODEL.test(model);
+  const signal = AbortSignal.timeout(args.timeoutMs);
+  let discovered = !canTryModel || isRecentlyRejected(args.apiKey, model);
+  const candidates = discovered ? await fetchGeminiModels(args.apiKey, signal) : [model];
+  let rejected: AiError | undefined;
+  for (let i = 0; i < Math.min(candidates.length, MODEL_ATTEMPT_LIMIT); i++) {
+    const candidate = candidates[i];
+    try {
+      return await generateWithModel(args, candidate, signal);
+    } catch (error) {
+      if (!(error instanceof AiError) || error.code !== 'unsupported_model') throw error;
+      rejected = error;
+      rejectModel(args.apiKey, candidate);
+      if (!discovered) {
+        discovered = true;
+        const alternatives = await fetchGeminiModels(args.apiKey, signal);
+        candidates.push(...alternatives.filter((alternative) => alternative !== candidate));
+      }
+    }
   }
+  throw rejected ?? new AiError('Gemini returned no available text models for this key.', {
+    code: 'unsupported_model', status: 400,
+  });
+}
+
+async function generateWithModel(args: ProviderArgs, model: string, signal: AbortSignal): Promise<ProviderResult> {
   const data = await geminiRequest(
     '/models/' + model + ':generateContent',
     args.apiKey,
-    AbortSignal.timeout(args.timeoutMs),
+    signal,
     {
       systemInstruction: { parts: [{ text: args.systemPrompt }] },
       contents: mergeConsecutive(args.messages).map((message) => ({
@@ -129,6 +205,7 @@ export async function generateGemini(
   const usage = data.usageMetadata;
   return {
     text,
+    model,
     usage: normalizeUsage({
       prompt: usage?.promptTokenCount,
       completion: usage?.candidatesTokenCount,

@@ -95,7 +95,7 @@ export async function POST(request: Request) {
 
     try {
       if (discover) return NextResponse.json({ models: await listGeminiModels(apiKeyPlain) })
-      await validateAiCredentials({
+      const testedModel = await validateAiCredentials({
         provider,
         model,
         apiKey: apiKeyPlain,
@@ -107,6 +107,7 @@ export async function POST(request: Request) {
         handoffAgentId: null,
         embeddingsApiKey: null,
       })
+      return NextResponse.json(testedModel ? { ok: true, model: testedModel } : { ok: true })
     } catch (err) {
       if (err instanceof AiError) {
         const error = { error: err.message, code: err.code }
@@ -126,7 +127,6 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json({ ok: true })
   } catch (err) {
     return toErrorResponse(err)
   }

@@ -58,6 +58,7 @@ export interface AiUsage {
 
 /** Raw text + usage a provider adapter returns before handoff parsing. */
 export interface ProviderResult {
+  model?: string
   assessment?: AiAssessment | null
   text: string
   usage: AiUsage | null
@@ -65,6 +66,7 @@ export interface ProviderResult {
 
 /** Outcome of a generation call. */
 export interface GenerateResult {
+  model?: string
   assessment?: AiAssessment | null
   /** The reply text, with any handoff sentinel stripped. */
   text: string

@@ -5,6 +5,7 @@ const h = vi.hoisted(() => ({
   validateCalls: [] as { provider: string; apiKey: string; baseUrl: string | null }[],
   updates: [] as Record<string, unknown>[],
   insertError: null as { code: string; message: string } | null,
+  testedModel: undefined as string | undefined,
 }))
 
 vi.mock('next/server', () => ({
@@ -55,6 +56,7 @@ vi.mock('@/lib/whatsapp/encryption', () => ({
 vi.mock('@/lib/ai/validate', () => ({
   validateAiCredentials: async (cfg: { provider: string; apiKey: string; baseUrl: string | null }) => {
     h.validateCalls.push({ provider: cfg.provider, apiKey: cfg.apiKey, baseUrl: cfg.baseUrl })
+    return h.testedModel
   },
 }))
 
@@ -79,6 +81,7 @@ beforeEach(() => {
   h.validateCalls = []
   h.updates = []
   h.insertError = null
+  h.testedModel = undefined
   h.stored = {
     id: 'cfg-1',
     provider: 'openai_compatible',
@@ -87,6 +90,15 @@ beforeEach(() => {
     api_key: 'enc-key',
   }
 })
+
+it.each([['auto', 'auto'], ['gemini-retired', 'gemini-4-hydrogen']])(
+  'saves Gemini setting %s as %s after validating a working model', async (model, savedModel) => {
+    h.testedModel = 'gemini-4-hydrogen'
+    const res = await post({ provider: 'gemini', model, api_key: 'new-key' })
+    expect(res.status).toBe(200)
+    expect(h.updates[0]).toMatchObject({ model: savedModel })
+  },
+)
 
 it('reports a missing configuration migration after the Gemini key validates', async () => {
   h.stored = null

@@ -152,7 +152,7 @@ export async function dispatchInboundToAiReply(
       knowledge,
     })
 
-    const { text, handoff, usage, assessment } = await generateReply({
+    const { text, handoff, usage, assessment, model: resolvedModel } = await generateReply({
       config,
       systemPrompt,
       messages,
@@ -170,7 +170,7 @@ export async function dispatchInboundToAiReply(
       conversationId,
       mode: 'auto_reply',
       provider: config.provider,
-      model: config.model,
+      model: resolvedModel ?? config.model,
       usage,
     })
 
