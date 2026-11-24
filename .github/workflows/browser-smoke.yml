@@ -24,7 +24,7 @@ jobs:
       - run: npm ci
       - run: npm install --no-save --package-lock=false playwright@1.61.1
       - run: npx playwright install --with-deps chromium
-      - run: supabase start
+      - run: supabase start -x storage-api,imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor
       - name: Verify two workspaces in Chromium
         shell: bash
         run: |
