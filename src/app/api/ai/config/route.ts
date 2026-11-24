@@ -14,6 +14,7 @@ import { normalizeN8nUrl, N8N_MODEL } from '@/lib/ai/providers/n8n'
 import { normalizeOpenAiCompatibleBaseUrl } from '@/lib/ai/providers/openai-compatible'
 import { canReuseStoredAiKey } from '@/lib/ai/stored-key'
 import { getT } from '@/lib/i18n/translate'
+import { isInboxChannel } from '@/lib/social/channels'
 
 const t = getT('Api')
 
@@ -48,7 +49,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key, qualification_criteria, apply_qualified_status, qualified_tag_id, agent_name, agent_purpose, agent_language',
+        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_channels, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key, qualification_criteria, apply_qualified_status, qualified_tag_id, agent_name, agent_purpose, agent_language',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -121,6 +122,10 @@ export async function POST(request: Request) {
     }
     const isActive = body.is_active === true
     const autoReplyEnabled = body.auto_reply_enabled === true
+    const channels = body.auto_reply_channels
+    if (channels !== undefined && (!Array.isArray(channels) || !channels.every(isInboxChannel))) {
+      return bad(t('ai.configInvalidChannels'))
+    }
 
     let maxPer = Number(body.auto_reply_max_per_conversation)
     if (!Number.isFinite(maxPer)) maxPer = 3
@@ -260,6 +265,7 @@ export async function POST(request: Request) {
     // Only touch the handoff target when the form actually sent the field,
     // so a partial save (e.g. flipping a toggle) doesn't wipe it.
     if (handoffProvided) shared.handoff_agent_id = handoffAgentId
+    if (channels !== undefined) shared.auto_reply_channels = [...new Set(channels)]
     if ('agent_name' in body) shared.agent_name = name || null
     if ('agent_purpose' in body) shared.agent_purpose = purpose || null
     if ('agent_language' in body) shared.agent_language = language

@@ -2,14 +2,16 @@
 DO $$
 BEGIN
   PERFORM agent_name, agent_purpose, agent_language, qualification_criteria,
-    apply_qualified_status, qualified_tag_id
+    apply_qualified_status, qualified_tag_id, auto_reply_channels
   FROM public.ai_configs WHERE false;
+  PERFORM ai_reply_claimed_at FROM public.messages WHERE false;
 
   PERFORM name, payload_fields FROM public.webhook_endpoints WHERE false;
   PERFORM event, response_status, result, created_at
   FROM public.webhook_deliveries WHERE false;
 
   IF to_regprocedure('public.record_ai_contact_assessment(uuid,uuid,text,text,text,boolean)') IS NULL
+    OR to_regprocedure('public.claim_inbound_ai_reply(uuid,uuid,text,integer,boolean)') IS NULL
     OR to_regprocedure('public.log_webhook_delivery(uuid,uuid,text,integer,text)') IS NULL THEN
     RAISE EXCEPTION 'Missing AI assessment or webhook delivery function';
   END IF;

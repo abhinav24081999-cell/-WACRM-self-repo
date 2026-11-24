@@ -16,6 +16,7 @@ export type AiProvider = 'openai' | 'anthropic' | 'gemini' | 'n8n' | 'openai_com
  * (stored AES-256-GCM-encrypted at rest).
  */
 export interface AiConfig {
+  autoReplyChannels?: readonly ('whatsapp' | 'instagram' | 'messenger')[]
   provider: AiProvider
   model: string
   /** Base URL for OpenAI-compatible providers; null for native providers. */

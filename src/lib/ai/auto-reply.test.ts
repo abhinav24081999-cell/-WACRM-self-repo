@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   engineSendText: vi.fn(),
   loadAccountMetaCredentials: vi.fn(),
   sendTypingIndicator: vi.fn(),
+  sendSocialAiReply: vi.fn(),
   state: {
     conv: null as Record<string, unknown> | null,
     autoResponders: [] as { id: string }[],
@@ -32,6 +33,7 @@ vi.mock('@/lib/flows/meta-send', () => ({
 vi.mock('@/lib/whatsapp/meta-api', () => ({
   sendTypingIndicator: h.sendTypingIndicator,
 }))
+vi.mock('@/lib/social/ai-reply', () => ({ sendSocialAiReply: h.sendSocialAiReply }))
 vi.mock('./admin-client', () => ({
   supabaseAdmin: () => ({
     from: (table: string) => {
@@ -139,8 +141,11 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     await dispatchInboundToAiReply(ARGS)
     expect(h.state.rpcCalls).toEqual([
       {
-        name: 'claim_ai_reply_slot',
-        args: { conversation_id: 'conv-1', max_replies: 3 },
+        name: 'claim_inbound_ai_reply',
+        args: {
+          p_account_id: 'acct-1', p_conversation_id: 'conv-1',
+          p_message_id: 'wamid.inbound-1', p_max_replies: 3, p_sends_reply: true,
+        },
       },
     ])
     expect(h.engineSendText).toHaveBeenCalledWith(
@@ -154,6 +159,21 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(h.retrieveKnowledge).toHaveBeenCalled()
     const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
     expect(systemPrompt).toContain('Returns accepted within 30 days.')
+  })
+
+  it('sends an enabled Instagram reply through its own channel and skips WhatsApp typing', async () => {
+    h.state.latestInbound = [{ message_id: 'instagram:mid-1' }]
+    h.loadAiConfig.mockResolvedValue(aiConfig({ provider: 'n8n', autoReplyChannels: ['instagram'] }))
+    await dispatchInboundToAiReply({ ...ARGS, channel: 'instagram', inboundMessageId: 'instagram:mid-1' })
+    expect(h.sendSocialAiReply).toHaveBeenCalledWith(expect.anything(), 'acct-1', 'conv-1', 'instagram', 'Hello!')
+    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.sendTypingIndicator).not.toHaveBeenCalled()
+  })
+
+  it('does not generate a reply for an unselected channel', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyChannels: ['whatsapp'] }))
+    await dispatchInboundToAiReply({ ...ARGS, channel: 'instagram' })
+    expect(h.generateReply).not.toHaveBeenCalled()
   })
 
   it('stands down when an active message-level automation exists', async () => {
@@ -330,7 +350,9 @@ describe('dispatchInboundToAiReply — handoff', () => {
     h.generateReply.mockResolvedValue({ text: '', handoff: true })
     await dispatchInboundToAiReply(ARGS)
     expect(h.engineSendText).not.toHaveBeenCalled()
-    expect(h.state.rpcCalls).toHaveLength(0)
+    expect(h.state.rpcCalls[0]).toMatchObject({
+      name: 'claim_inbound_ai_reply', args: { p_sends_reply: false },
+    })
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(h.state.updatePayload?.ai_handoff_summary).toContain(
       'AI agent handed off',

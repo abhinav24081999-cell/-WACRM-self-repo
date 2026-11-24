@@ -66,6 +66,18 @@ it('rejects replies without the expected correlation ID', async () => {
   });
 });
 
+it('retries a temporary gateway response once with the same correlation ID', async () => {
+  const transport = vi.mocked(postWebhook);
+  transport.mockResolvedValueOnce({ status: 503, body: '' });
+  transport.mockImplementationOnce(async (_url, _headers, body) => ({
+    status: 200,
+    body: JSON.stringify({ version: 1, correlation_id: JSON.parse(body).correlation_id, reply: 'Recovered' }),
+  }));
+  await expect(generateN8n(args, 'live')).resolves.toMatchObject({ text: 'Recovered' });
+  expect(transport).toHaveBeenCalledTimes(2);
+  expect(transport.mock.calls[1][2]).toBe(transport.mock.calls[0][2]);
+});
+
 it('requires the Production URL', () => {
   expect(() =>
     normalizeN8nUrl('https://n8n.example.test/webhook-test/agent')

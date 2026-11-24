@@ -30,7 +30,12 @@ Return HTTP 200 with this JSON structure. Use the incoming `correlation_id` unch
 }
 ```
 
-Set `handoff` to `true` to request human takeover. If qualification is enabled, the workflow can also return an `assessment` object with `outcome`, an exact `evidence` quote from the latest customer message, and a `follow_up` boolean. The allowed outcomes are `qualified`, `not_interested`, `needs_information` and `human_review`. WACRM sends the WhatsApp replies after checking conversation ownership and current settings. Configure n8n to return its answer without sending separately.
+Set `handoff` to `true` to request human takeover. If qualification is enabled, the workflow can also return an `assessment` object with `outcome`, an exact `evidence` quote from the latest customer message, and a `follow_up` boolean. The allowed outcomes are `qualified`, `not_interested`, `needs_information` and `human_review`. WACRM checks conversation ownership and current settings before sending the reply on the selected channel. Configure n8n to return its answer without sending separately.
+
+WACRM retries HTTP 502, 503, and 504 once when time remains, with the same
+`correlation_id`. It leaves retries after ambiguous network failures to the
+operator. Use the correlation ID to match execution records in n8n with
+HTTP status and attempt entries in the app's runtime logs.
 
 ## Outgoing event notifications
 

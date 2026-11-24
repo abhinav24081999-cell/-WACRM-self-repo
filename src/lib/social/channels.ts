@@ -7,6 +7,12 @@ export const channelLabels = {
 export type InboxChannel = keyof typeof channelLabels
 export type SocialChannel = Exclude<InboxChannel, 'whatsapp'>
 
+export const inboxChannels = ['whatsapp', 'instagram', 'messenger'] as const
+
+export function isInboxChannel(value: unknown): value is InboxChannel {
+  return value === 'whatsapp' || isSocialChannel(value)
+}
+
 export function isSocialChannel(value: unknown): value is SocialChannel {
   return value === 'instagram' || value === 'messenger'
 }

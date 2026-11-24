@@ -59,3 +59,17 @@ call it. It authenticates verification requests with the token, and
 delivered events with Meta's signature, before calling the existing
 `record_social_message` RPC. Point the Instagram webhook at the function's
 HTTPS URL. The Vercel settings still control replies and username lookups.
+
+For automatic replies on the Edge Function setup, point
+`WACRM_INSTAGRAM_WEBHOOK_URL` at the app's `/api/social/webhook/instagram`
+HTTPS endpoint. Use the same Instagram app secret and test account in both
+places. A protected Vercel preview also needs a Vercel automation secret in
+the Edge Function's `WACRM_INSTAGRAM_VERCEL_AUTOMATION_SECRET`. The Edge
+Function verifies the original signature and forwards it to Vercel, which
+persists the event and dispatches the reply. When the URL is unset, the
+function continues to persist events directly.
+
+In **Agents → Setup**, turn on automatic replies and select Instagram or
+Messenger in **Auto-reply channels**. New conversations on those channels
+can be handled by the configured Gemini or n8n agent. In existing paused
+threads, select **Resume AI** after reviewing the conversation.

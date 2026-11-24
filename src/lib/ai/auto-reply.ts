@@ -13,6 +13,8 @@ import {
 } from '@/lib/flows/meta-send'
 import { sendTypingIndicator } from '@/lib/whatsapp/meta-api'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { sendSocialAiReply } from '@/lib/social/ai-reply'
+import type { InboxChannel } from '@/lib/social/channels'
 
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
@@ -26,6 +28,7 @@ interface DispatchArgs {
    *  a typing indicator (which also marks it read) is shown while the
    *  reply is generated. Optional so older callers keep working. */
   inboundMessageId?: string
+  channel?: InboxChannel
 }
 
 /**
@@ -56,13 +59,14 @@ export async function dispatchInboundToAiReply(
     contactId,
     configOwnerUserId,
     inboundMessageId,
+    channel = 'whatsapp',
   } = args
 
   try {
     const db = supabaseAdmin()
 
     const config = await loadAiConfig(db, accountId)
-    if (!config || !config.autoReplyEnabled) return
+    if (!config?.autoReplyEnabled || !(config.autoReplyChannels ?? ['whatsapp']).includes(channel)) return
 
     // Deterministic, user-configured responders win over the LLM — the
     // caller already excludes messages a Flow consumed. Message-level
@@ -93,6 +97,7 @@ export async function dispatchInboundToAiReply(
     // Cheap early-out; the authoritative cap check is the atomic claim
     // below (this read can race a concurrent inbound).
     if (conv.ai_reply_count >= config.autoReplyMaxPerConversation) return
+    if (inboundMessageId && !(await isLatestUnclaimedInbound(db, conversationId, inboundMessageId))) return
 
     const messages = await buildConversationContext(db, conversationId)
     if (messages.length === 0) return
@@ -119,7 +124,7 @@ export async function dispatchInboundToAiReply(
     // 25 s or when our reply lands, whichever is first, so there's
     // nothing to undo on the handoff / no-text path. Strictly
     // best-effort: a failed indicator must never cost us the reply.
-    if (inboundMessageId) {
+    if (inboundMessageId && channel === 'whatsapp') {
       await showTypingIndicator(db, accountId, inboundMessageId)
     }
 
@@ -160,11 +165,28 @@ export async function dispatchInboundToAiReply(
     })
 
     const current = await loadAiConfig(db, accountId)
-    if (!current?.autoReplyEnabled || current.provider !== config.provider ||
+    if (!current?.autoReplyEnabled || !(current.autoReplyChannels ?? ['whatsapp']).includes(channel) ||
+        current.provider !== config.provider ||
         current.baseUrl !== config.baseUrl || current.apiKey !== config.apiKey ||
         current.model !== config.model || current.qualificationCriteria !== config.qualificationCriteria) return
 
-    if (inboundMessageId && !(await isLatestInbound(db, conversationId, inboundMessageId))) return
+    const sendsReply = !handoff && !!text
+    if (inboundMessageId || sendsReply) {
+      const { data: claimed, error: claimErr } = inboundMessageId
+        ? await db.rpc('claim_inbound_ai_reply', {
+            p_account_id: accountId,
+            p_conversation_id: conversationId,
+            p_message_id: inboundMessageId,
+            p_max_replies: current.autoReplyMaxPerConversation,
+            p_sends_reply: sendsReply,
+          })
+        : await db.rpc('claim_ai_reply_slot', {
+            conversation_id: conversationId,
+            max_replies: current.autoReplyMaxPerConversation,
+          })
+      if (claimErr) console.error('[ai auto-reply] could not claim inbound reply', claimErr.code)
+      if (claimErr || claimed !== true) return
+    }
 
     if (assessment && inboundMessageId) {
       const { error } = await db.rpc('record_ai_contact_assessment', {
@@ -206,28 +228,10 @@ export async function dispatchInboundToAiReply(
       return
     }
 
-    // Atomically claim a reply slot: the cap check + increment happen in
-    // one UPDATE, so concurrent inbounds can never overshoot the cap. If
-    // another inbound just took the last slot, `claimed` is false and we
-    // skip the send. (We consume a slot slightly before the send lands —
-    // fail-safe: under-reply rather than over-reply.)
-    const { data: claimed, error: claimErr } = await db.rpc(
-      'claim_ai_reply_slot',
-      {
-        conversation_id: conversationId,
-        max_replies: current.autoReplyMaxPerConversation,
-      },
-    )
-    if (claimErr) {
-      // A real error here (vs. losing the cap race) is almost always a
-      // deploy issue — e.g. `claim_ai_reply_slot` not EXECUTE-able by the
-      // service role, or the migration not applied. Log it loudly: a
-      // silent return makes "auto-reply never fires" undiagnosable.
-      console.error('[ai auto-reply] claim_ai_reply_slot failed:', claimErr)
+    if (channel !== 'whatsapp') {
+      await sendSocialAiReply(db, accountId, conversationId, channel, text)
       return
     }
-    if (claimed !== true) return
-
     await engineSendText({
       accountId,
       userId: configOwnerUserId,
@@ -241,20 +245,20 @@ export async function dispatchInboundToAiReply(
   }
 }
 
-async function isLatestInbound(
+async function isLatestUnclaimedInbound(
   db: ReturnType<typeof supabaseAdmin>,
   conversationId: string,
   inboundMessageId: string,
 ): Promise<boolean> {
   const { data, error } = await db
     .from('messages')
-    .select('message_id')
+    .select('message_id, ai_reply_claimed_at')
     .eq('conversation_id', conversationId)
     .eq('sender_type', 'customer')
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(1)
-  return !error && data?.[0]?.message_id === inboundMessageId
+  return !error && data?.[0]?.message_id === inboundMessageId && !data[0].ai_reply_claimed_at
 }
 
 /**

@@ -40,6 +40,7 @@ import type { AccountMember } from '@/types';
 import { fetchAccountMembers, memberLabel } from '@/lib/account/members';
 import { useTranslations } from 'next-intl';
 import { invalidateAiAccountStatus } from '@/lib/ai/account-status-cache';
+import { channelLabels, inboxChannels, type InboxChannel } from '@/lib/social/channels';
 
 const MASKED_KEY = '••••••••••••••••';
 
@@ -108,6 +109,7 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
   const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
   const [isActive, setIsActive] = useState(false);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
+  const [autoReplyChannels, setAutoReplyChannels] = useState<InboxChannel[]>(['whatsapp']);
   const [maxPerConversation, setMaxPerConversation] = useState(3);
   // Empty string = leave unassigned (shared queue).
   const [handoffAgentId, setHandoffAgentId] = useState('');
@@ -145,6 +147,7 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
         setQualifiedTag(data.qualified_tag_id ?? '');
         setIsActive(data.is_active);
         setAutoReplyEnabled(data.auto_reply_enabled);
+        setAutoReplyChannels(data.auto_reply_channels ?? ['whatsapp']);
         setMaxPerConversation(data.auto_reply_max_per_conversation ?? 3);
         setHandoffAgentId(data.handoff_agent_id ?? '');
         setHasStoredKey(Boolean(data.has_key));
@@ -225,6 +228,7 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
     qualified_tag_id: criteria.trim() ? qualifiedTag || null : null,
     is_active: isActive,
     auto_reply_enabled: autoReplyEnabled,
+    auto_reply_channels: autoReplyChannels,
     auto_reply_max_per_conversation: maxPerConversation,
     handoff_agent_id: handoffAgentId || null,
   });
@@ -336,6 +340,7 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
         setEmbeddingsKeyEdited(false);
         setIsActive(false);
         setAutoReplyEnabled(false);
+        setAutoReplyChannels(['whatsapp']);
         setSystemPrompt('');
         setCriteria('');
         setApplyQualified(false);
@@ -862,6 +867,26 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
                   disabled={disabled || !isActive}
                 />
               </div>
+              {autoReplyEnabled && (
+                <fieldset className="border-border rounded-md border px-3 pb-2" disabled={disabled || !isActive}>
+                  <legend className="px-1 text-sm font-medium">{t('autoReplyChannels')}</legend>
+                  <div className="flex flex-wrap gap-x-4">
+                    {inboxChannels.map((channel) => (
+                      <label key={channel} className="flex min-h-11 items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="accent-primary"
+                          checked={autoReplyChannels.includes(channel)}
+                          onChange={(event) => setAutoReplyChannels((channels) => event.target.checked
+                            ? [...channels, channel]
+                            : channels.filter((item) => item !== channel))}
+                        />
+                        {channelLabels[channel]}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
             </CardContent>
           </Card>
         )}

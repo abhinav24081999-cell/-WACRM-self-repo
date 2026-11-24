@@ -40,6 +40,31 @@ Deno.serve(async (request) => {
     return new Response(null, { status: 401 })
   }
 
+  const forwardUrl = Deno.env.get('WACRM_INSTAGRAM_WEBHOOK_URL')?.trim()
+  if (forwardUrl) {
+    try {
+      const url = new URL(forwardUrl)
+      if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash ||
+          url.pathname !== '/api/social/webhook/instagram') return new Response(null, { status: 503 })
+      const deploymentAccess = Deno.env.get('WACRM_INSTAGRAM_VERCEL_AUTOMATION_SECRET')?.trim()
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-hub-signature-256': signature,
+          ...(deploymentAccess ? { 'x-vercel-protection-bypass': deploymentAccess } : {}),
+        },
+        body: raw,
+        redirect: 'error',
+        signal: AbortSignal.timeout(15000),
+      })
+      // Retry a failed relay through Meta instead of persisting the event twice.
+      return response.ok ? new Response('EVENT_RECEIVED') : new Response(null, { status: 503 })
+    } catch {
+      return new Response(null, { status: 503 })
+    }
+  }
+
   let payload
   try {
     payload = JSON.parse(raw.toString('utf8'))

@@ -1292,8 +1292,9 @@ export function MessageThread({
       {/* AI auto-reply banner — take over an active bot, or resume it
           after a handoff. Renders nothing unless the account has
           auto-reply configured. */}
-      {!social && <AiThreadBanner
+      <AiThreadBanner
         conversationId={conversation.id}
+        channel={conversation.channel}
         disabled={conversation.ai_autoreply_disabled ?? false}
         handoffSummary={conversation.ai_handoff_summary}
         assignedAgentId={assignedAgentId}
@@ -1303,7 +1304,7 @@ export function MessageThread({
             onAssignChange(conversation.id, patch.assigned_agent_id ?? null);
           }
         }}
-      />}
+      />
 
       {/* Composer */}
       <MessageComposer
