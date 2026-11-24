@@ -18,6 +18,14 @@ still public. Apply the storage migration afterward, then verify authorized
 reads and signed sends and confirm former public URLs are denied. The
 migration changes visibility without moving objects or changing messages.
 
+A warmed public attachment URL in the preview continued to serve cached
+bytes immediately after the visibility change. Count existing objects before
+cutover. If the bucket contains historical objects, account for the old
+one-hour cache policy, confirm the provider's invalidation behavior, and
+verify that a warmed anonymous URL stops serving. Privacy verification
+requires both a fresh URL check and the warmed URL check. New chat uploads
+and mirrored attachments use a zero-duration storage cache policy.
+
 If a regression appears after the cutover, keep the bucket private and
 restore a release that has the authenticated reader. Restore public bucket
 access only as an explicitly approved emergency action, since this restores
