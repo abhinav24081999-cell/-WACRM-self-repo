@@ -13,7 +13,7 @@ const MODEL_ID = /^gemini-[a-z0-9.-]+$/;
 async function geminiRequest(
   path: string,
   apiKey: string,
-  timeoutMs: number,
+  signal: AbortSignal,
   body?: object
 ) {
   let response: Response;
@@ -23,7 +23,7 @@ async function geminiRequest(
       headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
       redirect: 'error',
-      signal: AbortSignal.timeout(timeoutMs),
+      signal,
     });
   } catch (error) {
     throw toNetworkError(error);
@@ -64,11 +64,12 @@ async function geminiRequest(
   );
 }
 
-export async function listGeminiModels(apiKey: string): Promise<string[]> {
+export async function listGeminiModels(apiKey: string, timeoutMs = aiRequestTimeoutMs()): Promise<string[]> {
+  const signal = AbortSignal.timeout(timeoutMs);
   const models = new Set<string>();
   let path = '/models?pageSize=1000';
   for (let page = 0; page < 10; page++) {
-    const data = await geminiRequest(path, apiKey, aiRequestTimeoutMs());
+    const data = await geminiRequest(path, apiKey, signal);
     for (const model of data.models ?? []) {
       const id = String(model.name).replace(/^models\//, '');
       if (
@@ -102,7 +103,7 @@ export async function generateGemini(
   const data = await geminiRequest(
     '/models/' + model + ':generateContent',
     args.apiKey,
-    args.timeoutMs,
+    AbortSignal.timeout(args.timeoutMs),
     {
       systemInstruction: { parts: [{ text: args.systemPrompt }] },
       contents: mergeConsecutive(args.messages).map((message) => ({

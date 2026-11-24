@@ -2348,6 +2348,7 @@
       "n8nSetupHint": "Use Header Auth no n8n e devolva a resposta ao WACRM. O fluxo recebe mensagens recentes quando as respostas automáticas estão ativadas.",
       "geminiLoadModels": "Carregar modelos Gemini",
       "geminiModelsLoaded": "Chave aceita. Escolha e teste um modelo.",
+      "geminiReplacementModels": "Este modelo está indisponível. Escolha um dos modelos carregados para sua chave e teste novamente.",
       "geminiNoModels": "Nenhum modelo de texto compatível foi encontrado para esta chave.",
       "geminiModelPlaceholder": "Escolha ou digite um modelo",
       "geminiSetupHint": "Cole sua chave, carregue os modelos disponíveis e teste o modelo escolhido.",

@@ -2348,6 +2348,7 @@
       "n8nSetupHint": "Use Header Auth in n8n and return the reply to WACRM. The workflow receives recent chat messages when automatic replies are enabled.",
       "geminiLoadModels": "Load Gemini models",
       "geminiModelsLoaded": "Key accepted. Choose a model, then test it.",
+      "geminiReplacementModels": "This model is unavailable. Choose one of the models loaded for your key and test again.",
       "geminiNoModels": "No supported text models were returned for this key.",
       "geminiModelPlaceholder": "Choose or enter a model",
       "geminiSetupHint": "Paste your key, load the models available to it, then test the model you choose.",

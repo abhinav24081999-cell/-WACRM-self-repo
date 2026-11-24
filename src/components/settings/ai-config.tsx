@@ -252,13 +252,14 @@ function AiConfigForm({ onGoToTest }: { onGoToTest: () => void }) {
         }),
       });
       const data = await res.json();
-      if (res.ok && discover) {
-        const models: string[] = data.models ?? [];
+      if (provider === 'gemini' && Array.isArray(data.models)) {
+        const models: string[] = data.models;
+        const messageKey = res.ok ? 'geminiModelsLoaded' : 'geminiReplacementModels';
         setGeminiModels(models);
         if (!models.includes(model)) setModel('');
         setConnectionFeedback({
-          ok: models.length > 0,
-          message: t(models.length ? 'geminiModelsLoaded' : 'geminiNoModels'),
+          ok: res.ok && models.length > 0,
+          message: t(models.length ? messageKey : 'geminiNoModels'),
         });
       } else {
         setConnectionFeedback({
