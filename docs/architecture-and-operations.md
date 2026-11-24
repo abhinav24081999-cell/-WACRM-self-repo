@@ -27,7 +27,7 @@ Run `npm run lint`, `npm run typecheck`, `npm test` and `npm run build`. The [CI
 ## Release and recover
 
 1. Confirm the Git revision, Vercel project and linked Supabase project for the target environment. Check applied migrations, auth redirect URLs and provider callbacks against that target. For preview, use a separate Supabase project and test credentials, numbers and destinations. Verify isolation before testing writes.
-2. Apply only the approved migrations in order, using compatible changes that leave existing data readable. Test the [relevant journeys](validation-and-branch-status.md). For Phase 1 and 2 SQL order and hosted Supabase settings, follow [access and auth emails](auth-emails.md).
+2. Apply only the approved migrations in order, using compatible changes that leave existing data readable. Test the [relevant journeys](validation-and-branch-status.md). For platform access, plans and billing SQL order and hosted Supabase settings, follow [access and auth emails](auth-emails.md).
 3. Check schedules. [Vercel configuration](../vercel.json) declares daily conversion processing at 02:00 UTC. Verify that automation waits and flow timeouts have their own authenticated schedule where required. The route handlers live under [automations](../src/app/api/automations/cron) and [flows](../src/app/api/flows/cron).
 4. For a rollback, identify the previous application deployment and confirm it can read the current schema. Stop affected provider sends or workers if needed. Treat database recovery as a separate change. Review backup or point-in-time recovery and the effect on writes since the backup before any restore. Recheck the inbox, login and integration behavior after recovery.
 

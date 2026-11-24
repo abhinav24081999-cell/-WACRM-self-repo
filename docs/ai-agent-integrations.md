@@ -37,3 +37,15 @@ Set `handoff` to `true` to request human takeover. If qualification is enabled, 
 Use **Settings → Webhooks** to send event notifications to n8n or another destination. Choose the events and fields, create the paused endpoint, copy the signing secret, and use **Send test**. This sends a sample with event name `webhook.test`. Review the result in **Delivery history**, then enable the endpoint.
 
 Each delivery contains a unique event ID and a timestamp. WACRM signs the timestamp and the raw JSON body with the endpoint secret. Use the [public API signing instructions](public-api.md) when verifying requests.
+
+## Provider setup and knowledge
+
+From **Agents → Setup**, choose OpenAI, Anthropic, Gemini, OpenAI-compatible or External AI (n8n). The native providers use their own key and model. For a compatible provider, supply the gateway URL and a model it exposes. A saved key is masked in the settings form. Test the provider, save the configuration and use Playground before allowing live replies. The server checks workspace permissions and the plan's AI feature.
+
+Add business instructions and manage knowledge in Setup. The knowledge base can use text search. Semantic retrieval requires a configured embeddings key and indexing. After editing the knowledge, try a question in Playground that should retrieve the updated answer. Review **Usage** for recorded calls, including draft, playground and automatic reply usage where present.
+
+## Qualification and takeover
+
+Add explicit qualification criteria and, if needed, select a qualified contact tag and enable automatic application. An assessment must cite evidence from the latest inbound message. Inspect the assessment on a test contact before relying on automatic tagging. Qualification notes and tags are separate from a CRM lead milestone and provider conversion delivery.
+
+The inbox supports drafting a reply for human review. With automatic replies enabled, the application checks the conversation's cap and pause state. A handoff pauses automatic replies for that conversation, records a summary, and can route an unassigned thread to the configured teammate. Use a synthetic inbound chat to verify the reply, manual takeover and resuming the assistant where appropriate. If configuration fails to load, see [operations troubleshooting](architecture-and-operations.md#troubleshooting).

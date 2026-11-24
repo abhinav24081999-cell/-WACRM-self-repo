@@ -1,9 +1,13 @@
 # WACRM product handbook
 
-This handbook describes `-WACRM-self-repo` main at `eb88c7e`. Features below have code on that revision. Availability in a running instance also depends on the applied database migrations, credentials, environment and user role.
+This handbook describes `-WACRM-self-repo` main at `affd9e7`. Features below have code on that revision. Availability in a running instance also depends on the applied database migrations, credentials, environment and user role.
 
 - [Product guide](product-guide.md) for agents, workspace admins and the platform operator.
+- [Messaging, campaigns and workflow operations](messaging-workflows.md) for inbox, broadcasts, automations and flows.
+- [Contacts, leads, deals and reporting](crm-workflows.md) for contact import, qualification, pipelines and reports.
+- [Workspace administration, plans and billing](workspace-administration.md) for provisioning, permissions and commercial access.
 - [Architecture and operations](architecture-and-operations.md) for development, deployment and support.
+- [Feature coverage](feature-coverage.md) maps application entry points to their guides.
 - [Validation and branch status](validation-and-branch-status.md) for QA, release review and features under development.
 
 ## Integration reference
