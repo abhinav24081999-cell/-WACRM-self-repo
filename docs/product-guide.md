@@ -4,9 +4,9 @@
 
 Use **Login** with an existing account. **Forgot password** sends a Supabase recovery email. If you received a team invitation, open its link and sign in before accepting. Platform administrators provision customer logins. See [auth setup and recovery](auth-emails.md).
 
-A workspace is an account in the code and database. Choose the intended workspace before reading or updating records. Owners and admins manage team members and workspace settings. Agents perform operational work such as replying, creating contacts and moving deals. Viewers have read-only access to operational data. Ownership transfer and workspace deletion are owner controls. Some settings and provider reports have additional checks.
+A workspace is an account in the code and database. Check the workspace shown in the app before reading or updating records. Owners and admins manage team members and workspace settings. Agents perform operational work such as replying, creating contacts and moving deals. Viewers have read-only access to operational data. Ownership transfer and workspace deletion are owner controls. Some settings and provider reports have additional checks.
 
-The **Admin** entry belongs to the configured platform administrator, who can open the workspace directory, search across workspaces, see summary counts and audit activity, and rename workspaces. Customer provisioning and workspace renaming are disabled on Vercel previews and the preview dashboard uses sample data. See [branch status](validation-and-branch-status.md) for plans, configurable roles and commercial operations.
+The **Admin** entry belongs to the configured platform administrator, who can open the workspace directory, search across workspaces, see summary counts and audit activity, and rename workspaces. Shared Vercel previews show sample data and block platform customer writes. An isolated preview can use its own data. See [workspace administration](workspace-administration.md) for plans, role permissions and billing.
 
 ## Run the inbox
 
@@ -29,12 +29,12 @@ Admins configure inbox labels, reply behavior and saved **Quick replies** from S
 ## Send campaigns and configure templates
 
 1. In **Settings → Templates**, manage WhatsApp templates and sync their provider status. Verify the template's language, variables, category and approval before choosing it.
-2. Open **Broadcasts → New**. Choose a template, select a CRM audience or import a CSV, map recipient variables, then review and schedule or send. Use synthetic contacts and a test sender when evaluating a campaign.
+2. Open **Broadcasts → New**. Choose a template, select a CRM audience or import a CSV, map recipient variables, then review, save a draft or send now. Use synthetic contacts and a test sender when evaluating a campaign.
 3. Open the broadcast detail to review recipient delivery states and failure reasons. Resume interrupted delivery where available and review recipients before retrying.
 
 ## Automate conversations
 
-**Automations** are event-driven or scheduled rules. Create a rule, pick a trigger and build its steps. Triggers include inbound and first inbound messages, keywords, new contacts, assignment, added tags, time-based rules and interactive replies. Steps can send messages, branch, wait, change tags or call a webhook. Review the rule's logs after a test. Delayed steps need a working scheduler.
+**Automations** are event-driven or scheduled rules. Create a rule, pick a trigger and build its steps. Triggers include inbound and first inbound messages, keywords, new contacts, assignment, added tags, time-based rules and interactive replies. Steps can send messages, branch, wait, change tags or call a webhook. Review the rule's logs after a test. Delayed steps need a working scheduler. See [workflow operations](messaging-workflows.md) for trigger and assignment limits.
 
 **Flows** are guided WhatsApp conversations. Start from a template or create a flow. The graph can send messages, media, buttons or lists, collect replies, branch on variables, tags or contact fields, apply a tag, hand off or end. The model includes keyword, first inbound and manual trigger types. Validate before activation and use **Runs** to review progress, timeouts and failures. Verify reply handling and handoff with a test conversation.
 
