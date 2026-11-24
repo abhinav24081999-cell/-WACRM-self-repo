@@ -109,10 +109,15 @@ export async function POST(request: Request) {
       })
     } catch (err) {
       if (err instanceof AiError) {
-        return NextResponse.json(
-          { error: err.message, code: err.code },
-          { status: 400 },
-        )
+        const error = { error: err.message, code: err.code }
+        if (provider === 'gemini' && !discover && err.code === 'unsupported_model') {
+          const models = await listGeminiModels(apiKeyPlain, 5000).catch(() => undefined)
+          if (models) {
+            const rejectedModel = model.replace(/^models\//, '')
+            return NextResponse.json({ ...error, models: models.filter(id => id !== rejectedModel) }, { status: 400 })
+          }
+        }
+        return NextResponse.json(error, { status: 400 })
       }
       console.error('[ai/test] validation error:', err)
       return NextResponse.json(

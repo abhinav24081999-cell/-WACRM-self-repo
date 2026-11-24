@@ -2348,6 +2348,7 @@
       "n8nSetupHint": "n8n에서 Header Auth를 사용하고 응답을 WACRM에 반환하세요. 자동 응답이 활성화되면 워크플로에 최근 대화가 전송됩니다.",
       "geminiLoadModels": "Gemini 모델 불러오기",
       "geminiModelsLoaded": "키가 확인되었습니다. 모델을 선택하고 테스트하세요.",
+      "geminiReplacementModels": "이 모델을 사용할 수 없습니다. 키로 불러온 모델 중 하나를 선택하고 다시 테스트하세요.",
       "geminiNoModels": "이 키로 사용할 수 있는 텍스트 모델이 없습니다.",
       "geminiModelPlaceholder": "모델 선택 또는 입력",
       "geminiSetupHint": "키를 붙여넣고 사용 가능한 모델을 불러온 뒤 선택한 모델을 테스트하세요.",
