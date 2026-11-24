@@ -1,4 +1,4 @@
-export function assertPreviewDatabase(env: NodeJS.ProcessEnv) {
+export function assertPreviewDatabase(env: Record<string, string | undefined>) {
   if (env.VERCEL_ENV !== 'preview') return;
 
   const preview = env.WACRM_ISOLATED_PREVIEW_PROJECT_REF?.trim();
