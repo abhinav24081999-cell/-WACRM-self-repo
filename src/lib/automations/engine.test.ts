@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+vi.mock('@/lib/auth/workspace-entitlements', () => ({
+  workspaceActionAllowed: async () => true,
+  workspaceFeatureAllowed: async () => true,
+}));
+
 // Shared mock state for the service-role client. Lives in a hoisted block
 // so the vi.mock factory below can close over it.
 const h = vi.hoisted(() => ({

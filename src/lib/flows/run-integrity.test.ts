@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock('@/lib/auth/workspace-entitlements', () => ({
+  workspaceActionAllowed: async () => true,
+  workspaceFeatureAllowed: async () => true,
+}));
 import type { FakeTables } from "./fake-db.test-helper";
 
 const h = vi.hoisted(() => ({

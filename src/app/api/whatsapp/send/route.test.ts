@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/lib/auth/workspace-entitlements', () => ({
+  workspaceActionAllowed: async () => true,
+  workspaceFeatureAllowed: async () => true,
+}));
+
 // ---------------------------------------------------------------------------
 // Tests for the `contact_id` send path (issue #296): sending an approved
 // template to a single contact from the Contact detail view. The route must

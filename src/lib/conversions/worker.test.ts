@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
+vi.mock('@/lib/auth/workspace-entitlements', () => ({
+  workspaceActionAllowed: async () => true,
+  workspaceFeatureAllowed: async () => true,
+}));
+
 const { claim, update } = vi.hoisted(() => ({ claim: vi.fn(), update: vi.fn() }))
 vi.mock('@/lib/flows/admin-client', () => ({ supabaseAdmin: () => ({
   rpc: claim,

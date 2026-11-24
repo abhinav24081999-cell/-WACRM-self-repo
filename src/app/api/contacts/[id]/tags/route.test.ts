@@ -62,7 +62,7 @@ describe('/api/contacts/[id]/tags', () => {
     const response = await POST(request('POST', { tag_id: 'tag-1' }), params);
 
     expect(response.status).toBe(200);
-    expect(mocks.requireRole).toHaveBeenCalledWith('agent');
+    expect(mocks.requireRole).toHaveBeenCalledWith('agent', 'contacts');
     expect(mocks.add).toHaveBeenCalledWith({
       db: context.supabase,
       accountId: 'account-1',

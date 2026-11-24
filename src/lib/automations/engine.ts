@@ -1,3 +1,4 @@
+import { workspaceFeatureAllowed } from '@/lib/auth/workspace-entitlements'
 import type {
   Automation,
   AutomationLogStepResult,
@@ -72,6 +73,7 @@ export interface DispatchInput {
 export async function runAutomationsForTrigger(input: DispatchInput): Promise<void> {
   try {
     const db = supabaseAdmin()
+    if (!(await workspaceFeatureAllowed(db, input.accountId, 'automation'))) return
 
     // Tenant isolation. `contactId` can be caller-supplied (the manual
     // POST /api/automations/engine entrypoint reads it straight from the
@@ -190,6 +192,11 @@ export async function resumePendingExecution(pending: {
   }
 
   try {
+    if (!(await workspaceFeatureAllowed(db, pending.account_id, 'automation'))) {
+      await markPending(pending.id, 'expired')
+      await setLogError(pending.log_id, tErr('pausedWhileWaiting'))
+      return
+    }
     const resumePoint = await resolveResumePoint(pending, pending.automation_id)
     if (!resumePoint) {
       await markPending(pending.id, 'expired')
@@ -255,7 +262,7 @@ export async function resumeAwaitingReply(input: AwaitingReplyInput): Promise<bo
       return false
     }
     const pending = rows?.[0] as PendingRow | undefined
-    if (!pending) return false
+    if (!pending || !(await workspaceFeatureAllowed(db, input.accountId, 'automation'))) return false
 
     // Claim it. Gated on the CURRENT status so two deliveries racing on
     // the same parked run can't both resume it.

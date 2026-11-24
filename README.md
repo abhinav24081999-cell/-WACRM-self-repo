@@ -82,12 +82,10 @@ in an afternoon and make yours.
 # Fork on GitHub first: https://github.com/ArnasDon/wacrm → Fork
 git clone https://github.com/<your-username>/wacrm.git
 cd wacrm
-npm install
-cp .env.local.example .env.local   # fill in Supabase + Meta creds
-npm run dev
+npm ci
 ```
 
-Open <http://localhost:3000>. You'll be redirected to `/login` (or
+Create `.env.local` and apply the test database migrations using the [local setup guide](docs/architecture-and-operations.md#run-locally), then run `npm run dev`. Open <http://localhost:3000>. You'll be redirected to `/login` (or
 `/dashboard` if already signed in).
 
 The UI ships in English, Korean, Brazilian Portuguese and Spanish — set
@@ -144,6 +142,8 @@ Full walkthrough with screenshots:
 > required._
 
 ## Documentation
+
+For this fork, start with the [WACRM product handbook](docs/README.md). It covers product workflows, architecture, release verification, and development-branch status.
 
 Full self-host documentation — Supabase migrations, WhatsApp Business
 API config, and production deploy — lives at

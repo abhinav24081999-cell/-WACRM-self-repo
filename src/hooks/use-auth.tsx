@@ -61,6 +61,7 @@ export type AccountStatus =
   | "ready"
   /** Signed in, but no profile row / no account / no role on it. */
   | "unlinked"
+  | "restricted"
   /** The profile lookup itself failed after retrying. */
   | "error";
 
@@ -255,6 +256,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               name: account.name,
               default_currency: account.default_currency ?? DEFAULT_CURRENCY,
             };
+          } else {
+            const { data: access } = await supabase.rpc("current_workspace_access");
+            if (access === "expired" || access === "suspended" || access === "scheduled") {
+              setStatusDetail(access);
+            }
           }
         }
 
@@ -399,10 +405,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // each derived value a stable identity for React.memo / useEffect
   // dependencies downstream.
   const derived = useMemo(() => {
-    const role = profile?.account_role ?? null;
+    const role = account ? profile?.account_role ?? null : null;
     return {
       accountRole: role,
-      accountId: profile?.account_id ?? null,
+      accountId: account?.id ?? null,
       isOwner: role === "owner",
       isAdmin: role === "admin",
       isAgent: role === "agent",
@@ -411,7 +417,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canEditSettings: role ? canEditSettingsFor(role) : false,
       canSendMessages: role ? canSendMessagesFor(role) : false,
     };
-  }, [profile?.account_role, profile?.account_id]);
+  }, [profile?.account_role, account]);
 
   // Signed out is not a broken account — the shell redirects to /login
   // before anything reads this.
@@ -421,9 +427,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? "loading"
       : !profile
         ? "error"
-        : derived.accountId && derived.accountRole
-          ? "ready"
-          : "unlinked";
+        : statusDetail === "expired" || statusDetail === "suspended" || statusDetail === "scheduled"
+          ? "restricted"
+          : derived.accountId && derived.accountRole ? "ready" : "unlinked";
 
   return (
     <AuthContext.Provider

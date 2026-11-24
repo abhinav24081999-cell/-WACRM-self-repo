@@ -27,6 +27,7 @@
 // past its own account because the account is fixed at lookup time.
 // ============================================================
 
+import { workspaceFeatureAllowed } from '@/lib/auth/workspace-entitlements'
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { supabaseAdmin } from '@/lib/flows/admin-client';
@@ -103,11 +104,18 @@ export async function requireApiKey(
     throw forbidden(`This API key is missing the '${scope}' scope`);
   }
 
+  const db = supabaseAdmin();
+  if (scope === 'webhooks:manage' && !(await workspaceFeatureAllowed(db, row.account_id, 'webhooks'))) {
+    throw forbidden('Your workspace plan does not include webhooks');
+  }
+  if (scope === 'broadcasts:send' && !(await workspaceFeatureAllowed(db, row.account_id, 'campaigns'))) {
+    throw forbidden('Your workspace plan does not include campaigns');
+  }
   touchLastUsed(row.id);
 
   return {
     authType: 'api_key',
-    supabase: supabaseAdmin(),
+    supabase: db,
     accountId: row.account_id,
     keyId: row.id,
     scopes: row.scopes,

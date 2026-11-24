@@ -28,6 +28,7 @@ import {
 export function AccountAccessAlert() {
   const { accountStatus, accountStatusDetail, refreshProfile } = useAuth();
   const t = useTranslations("AccountAccess");
+  const commercial = useTranslations("PlatformCommercial");
   const [retrying, setRetrying] = useState(false);
 
   if (accountStatus === "loading" || accountStatus === "ready") return null;
@@ -45,11 +46,13 @@ export function AccountAccessAlert() {
     <Alert variant="destructive" className="mb-4">
       <TriangleAlert />
       <AlertTitle>
-        {accountStatus === "unlinked" ? t("unlinkedTitle") : t("errorTitle")}
+        {accountStatus === "restricted" ? commercial("accessTitle") :
+          accountStatus === "unlinked" ? t("unlinkedTitle") : t("errorTitle")}
       </AlertTitle>
       <AlertDescription>
-        {accountStatus === "unlinked" ? t("unlinkedBody") : t("errorBody")}
-        {accountStatusDetail ? (
+        {accountStatus === "restricted" ? commercial(`access_${accountStatusDetail}`) :
+          accountStatus === "unlinked" ? t("unlinkedBody") : t("errorBody")}
+        {accountStatusDetail && accountStatus !== "restricted" ? (
           // The raw reason, so a self-hoster reading a bug report has
           // something to act on instead of just "it's broken".
           <span className="mt-1 block font-mono text-xs opacity-70">

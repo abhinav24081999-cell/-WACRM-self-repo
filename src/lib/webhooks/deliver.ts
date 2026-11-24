@@ -1,3 +1,4 @@
+import { workspaceFeatureAllowed } from '@/lib/auth/workspace-entitlements'
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/whatsapp/encryption';
@@ -127,7 +128,7 @@ export async function dispatchWebhookEvent(
       .eq('is_active', true)
       .contains('events', [event]);
 
-    if (error || !rows?.length) return;
+    if (error || !rows?.length || !(await workspaceFeatureAllowed(db, accountId, 'webhooks'))) return;
     const payload = envelope(accountId, event, data);
     await Promise.allSettled(
       (rows as DeliveryEndpoint[]).map(async (row) => {

@@ -1,6 +1,21 @@
 import { supabaseAdmin } from '@/lib/flows/admin-client';
+import type { CommercialTotals } from '@/lib/platform/commercial';
 
 export const WORKSPACE_PAGE_SIZE = 25;
+
+export async function getCommercialTotals(
+  shared: boolean
+): Promise<CommercialTotals | null> {
+  if (shared) return null;
+  try {
+    const { data, error } = await supabaseAdmin().rpc(
+      'platform_commercial_totals'
+    );
+    return error ? null : (data as CommercialTotals);
+  } catch {
+    return null;
+  }
+}
 
 export type Workspace = {
   id: string;
@@ -31,75 +46,12 @@ type DashboardData = {
   }[];
 };
 
-const sample: DashboardData = {
-  totals: { workspaces: 3, team: 7, contacts: 576, whatsapp: 3 },
-  has_more: false,
-  workspaces: [
-    {
-      id: 'sample-studio',
-      name: 'Northstar Studio',
-      owner_email: 'maya@example.com',
-      created_at: '2026-11-22T10:30:00Z',
-      members: 4,
-      contacts: 312,
-      whatsapp: 2,
-    },
-    {
-      id: 'sample-retail',
-      name: 'Cedar Retail',
-      owner_email: 'priya@example.com',
-      created_at: '2026-11-20T09:20:00Z',
-      members: 3,
-      contacts: 186,
-      whatsapp: 1,
-    },
-    {
-      id: 'sample-support',
-      name: 'Harbor Support',
-      owner_email: 'sam@example.com',
-      created_at: '2026-11-16T08:25:00Z',
-      members: 3,
-      contacts: 78,
-      whatsapp: 0,
-    },
-  ],
-  activity: [
-    {
-      id: 'sample-rename',
-      kind: 'renamed',
-      workspace_name: 'Cedar Retail',
-      old_name: 'Cedar Shop',
-      created_at: '2026-11-23T10:15:00Z',
-      actor: 'Platform admin',
-    },
-    {
-      id: 'sample-create',
-      kind: 'created',
-      workspace_name: 'Northstar Studio',
-      old_name: null,
-      created_at: '2026-11-22T10:30:00Z',
-      actor: 'Platform admin',
-    },
-  ],
-};
-
 export async function getDashboardData(
   search: string,
   offset: number,
   preview: boolean
 ): Promise<DashboardData | null> {
-  if (preview) {
-    const term = search.toLowerCase();
-    const workspaces = sample.workspaces.filter(
-      ({ name, owner_email }) =>
-        name.toLowerCase().includes(term) ||
-        owner_email?.toLowerCase().includes(term)
-    );
-    return {
-      ...sample,
-      workspaces: workspaces.slice(offset, offset + WORKSPACE_PAGE_SIZE),
-    };
-  }
+  if (preview) return null;
 
   try {
     const { data, error } = await supabaseAdmin().rpc(

@@ -9,6 +9,7 @@ import {
   ContactRound,
   MessageSquare,
   Plus,
+  Receipt,
   Search,
   UsersRound,
 } from 'lucide-react';
@@ -32,9 +33,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getDashboardData, WORKSPACE_PAGE_SIZE } from './dashboard-data';
-import { ProvisionCustomerForm } from './provision-customer-form';
+import {
+  getCommercialTotals,
+  getDashboardData,
+  WORKSPACE_PAGE_SIZE,
+} from './dashboard-data';
+import { ProvisionUserForm } from '@/components/users/provision-user-form';
 import { WorkspaceDetails } from './workspace-details';
+import { getPlans, getWorkspacePlans } from './plan-data';
 
 export default async function PlatformAdminPage({
   searchParams,
@@ -43,12 +49,15 @@ export default async function PlatformAdminPage({
 }) {
   if (!(await getPlatformAdmin())) redirect('/dashboard');
 
-  const [t, access, locale, params] = await Promise.all([
-    getTranslations('PlatformDashboard'),
-    getTranslations('PlatformAccess'),
-    getLocale(),
-    searchParams,
-  ]);
+  const [t, access, planText, commercialText, locale, params] =
+    await Promise.all([
+      getTranslations('PlatformDashboard'),
+      getTranslations('PlatformAccess'),
+      getTranslations('WorkspacePlans'),
+      getTranslations('PlatformCommercial'),
+      getLocale(),
+      searchParams,
+    ]);
   const search =
     typeof params.q === 'string' ? params.q.trim().slice(0, 120) : '';
   const requestedPage =
@@ -65,7 +74,22 @@ export default async function PlatformAdminPage({
     (page - 1) * WORKSPACE_PAGE_SIZE,
     readOnly
   );
+  const [plans, workspacePlans, commercial] = await Promise.all([
+    getPlans(readOnly),
+    getWorkspacePlans(
+      data?.workspaces.map((workspace) => workspace.id) ?? [],
+      readOnly
+    ),
+    getCommercialTotals(readOnly),
+  ]);
+  const assignmentById = new Map(
+    workspacePlans?.map((assignment) => [assignment.account_id, assignment])
+  );
   const number = new Intl.NumberFormat(locale);
+  const currency = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'INR',
+  });
   const date = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeZone: 'Asia/Kolkata',
@@ -93,6 +117,25 @@ export default async function PlatformAdminPage({
           total: data.totals.whatsapp,
           icon: MessageSquare,
         },
+        ...(commercial
+          ? [
+              {
+                label: commercialText('collectedThisMonth'),
+                total: currency.format(commercial.revenue_paise / 100),
+                icon: Receipt,
+              },
+              {
+                label: commercialText('activePaid'),
+                total: commercial.active_paid,
+                icon: Building2,
+              },
+              {
+                label: commercialText('openTrials'),
+                total: commercial.trials,
+                icon: UsersRound,
+              },
+            ]
+          : []),
       ]
     : [];
 
@@ -124,21 +167,32 @@ export default async function PlatformAdminPage({
             {t('description')}
           </p>
         </div>
-        <Dialog>
-          <DialogTrigger render={<Button className="h-11 px-4" />}>
-            <Plus aria-hidden="true" />
-            {access('createCustomer')}
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader className="pr-7">
-              <DialogTitle>{access('createCustomer')}</DialogTitle>
-              <DialogDescription>
-                {access('createDescription')}
-              </DialogDescription>
-            </DialogHeader>
-            <ProvisionCustomerForm readOnly={readOnly} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/platform-admin/plans"
+            className={buttonVariants({
+              variant: 'outline',
+              className: 'h-11',
+            })}
+          >
+            {planText('title')}
+          </Link>
+          <Dialog>
+            <DialogTrigger render={<Button className="h-11 px-4" />}>
+              <Plus aria-hidden="true" />
+              {access('createCustomer')}
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader className="pr-7">
+                <DialogTitle>{access('createCustomer')}</DialogTitle>
+                <DialogDescription>
+                  {access('createDescription')}
+                </DialogDescription>
+              </DialogHeader>
+              <ProvisionUserForm readOnly={readOnly} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {readOnly && (
@@ -163,7 +217,7 @@ export default async function PlatformAdminPage({
                   />
                 </dt>
                 <dd className="mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">
-                  {number.format(total)}
+                  {typeof total === 'number' ? number.format(total) : total}
                 </dd>
               </div>
             ))}
@@ -251,6 +305,8 @@ export default async function PlatformAdminPage({
                               new Date(workspace.created_at)
                             )}
                             readOnly={readOnly}
+                            plans={workspacePlans ? plans : null}
+                            assignment={assignmentById.get(workspace.id)}
                           />
                         </TableCell>
                       </TableRow>
