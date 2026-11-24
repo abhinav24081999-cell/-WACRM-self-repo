@@ -1,16 +1,5 @@
 {
-  "git": {
-    "deploymentEnabled": {
-      "fix/audit-01-schema-parity": false,
-      "fix/audit-05-dependency-patches": false,
-      "fix/audit-04-workspace-integrity": false,
-      "fix/audit-19-mcp-dependabot": false
-    }
-  },
   "crons": [
-    {
-      "path": "/api/conversion-feedback/cron",
-      "schedule": "0 2 * * *"
-    }
+    { "path": "/api/conversion-feedback/cron", "schedule": "0 2 * * *" }
   ]
 }
