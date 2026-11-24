@@ -97,7 +97,6 @@ export async function dispatchInboundToAiReply(
     // Cheap early-out; the authoritative cap check is the atomic claim
     // below (this read can race a concurrent inbound).
     if (conv.ai_reply_count >= config.autoReplyMaxPerConversation) return
-    if (inboundMessageId && !(await isLatestUnclaimedInbound(db, conversationId, inboundMessageId))) return
 
     const messages = await buildConversationContext(db, conversationId)
     if (messages.length === 0) return
@@ -116,6 +115,17 @@ export async function dispatchInboundToAiReply(
         `[ai auto-reply] account ${accountId} hit the per-account rate limit — skipping this inbound.`,
       )
       return
+    }
+
+    if (inboundMessageId) {
+      const { data: started, error } = await db.rpc('begin_inbound_ai_reply', {
+        p_account_id: accountId,
+        p_conversation_id: conversationId,
+        p_message_id: inboundMessageId,
+        p_max_replies: config.autoReplyMaxPerConversation,
+      })
+      if (error) console.error('[ai auto-reply] could not start inbound reply', error.code)
+      if (error || started !== true) return
     }
 
     // Every gate has passed — we're committed to attempting a reply, so
@@ -243,22 +253,6 @@ export async function dispatchInboundToAiReply(
   } catch (err) {
     console.error('[ai auto-reply] dispatch failed:', err)
   }
-}
-
-async function isLatestUnclaimedInbound(
-  db: ReturnType<typeof supabaseAdmin>,
-  conversationId: string,
-  inboundMessageId: string,
-): Promise<boolean> {
-  const { data, error } = await db
-    .from('messages')
-    .select('message_id, ai_reply_claimed_at')
-    .eq('conversation_id', conversationId)
-    .eq('sender_type', 'customer')
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(1)
-  return !error && data?.[0]?.message_id === inboundMessageId && !data[0].ai_reply_claimed_at
 }
 
 /**

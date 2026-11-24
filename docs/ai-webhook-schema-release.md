@@ -10,8 +10,9 @@ The webhook manager also requires its delivery table and endpoint columns.
 2. In an isolated rehearsal, compare the existing schema and migration ledger
    against `20261123120000_ai_provider_connections.sql`,
    `20261123121000_webhook_manager.sql`,
-   `20261123122000_ai_contact_qualification.sql`, and
-   `20261124122743_inbound_ai_reply_claim.sql`. Apply the missing scripts in
+   `20261123122000_ai_contact_qualification.sql`,
+   `20261124122743_inbound_ai_reply_claim.sql`, and
+   `20261124123953_inbound_ai_generation_lease.sql`. Apply the missing scripts in
    that order. If the schema was partly applied or the ledger names differ,
    reconcile the actual objects and recorded versions before running anything.
 3. Rerun the schema check. Use two test workspaces to save and reload different

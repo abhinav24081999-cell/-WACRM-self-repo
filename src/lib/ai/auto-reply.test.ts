@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
     updatePayload: null as Record<string, unknown> | null,
     updates: [] as { payload: Record<string, unknown>; isNull: string[] }[],
     rpcCalls: [] as { name: string; args: unknown }[],
+    started: false,
     latestInbound: [] as { message_id: string }[],
   },
 }))
@@ -48,16 +49,6 @@ vi.mock('./admin-client', () => ({
         }
         return chain
       }
-      if (table === 'messages') {
-        const chain = {
-          select: () => chain,
-          eq: () => chain,
-          order: () => chain,
-          limit: () =>
-            Promise.resolve({ data: h.state.latestInbound, error: null }),
-        }
-        return chain
-      }
       // conversations
       const conversation = {
         select: () => conversation,
@@ -79,7 +70,12 @@ vi.mock('./admin-client', () => ({
       }
       return conversation
     },
-    rpc: (name: string, args: unknown) => {
+    rpc: (name: string, args: { p_message_id?: string }) => {
+      if (name === 'begin_inbound_ai_reply') {
+        const acquired = !h.state.started && args.p_message_id === h.state.latestInbound[0]?.message_id
+        if (acquired) h.state.started = true
+        return Promise.resolve({ data: acquired, error: null })
+      }
       h.state.rpcCalls.push({ name, args })
       return Promise.resolve({ data: h.state.claim, error: null })
     },
@@ -123,6 +119,7 @@ beforeEach(() => {
   h.state.updatePayload = null
   h.state.updates = []
   h.state.rpcCalls = []
+  h.state.started = false
   h.state.latestInbound = [{ message_id: 'wamid.inbound-1' }]
   h.loadAiConfig.mockResolvedValue(aiConfig())
   h.buildConversationContext.mockResolvedValue([{ role: 'user', content: 'hi' }])
@@ -168,6 +165,15 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(h.sendSocialAiReply).toHaveBeenCalledWith(expect.anything(), 'acct-1', 'conv-1', 'instagram', 'Hello!')
     expect(h.engineSendText).not.toHaveBeenCalled()
     expect(h.sendTypingIndicator).not.toHaveBeenCalled()
+  })
+
+  it('starts one n8n execution when duplicate Instagram deliveries run together', async () => {
+    h.state.latestInbound = [{ message_id: 'instagram:mid-1' }]
+    h.loadAiConfig.mockResolvedValue(aiConfig({ provider: 'n8n', autoReplyChannels: ['instagram'] }))
+    const inbound = { ...ARGS, channel: 'instagram' as const, inboundMessageId: 'instagram:mid-1' }
+    await Promise.all([dispatchInboundToAiReply(inbound), dispatchInboundToAiReply(inbound)])
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    expect(h.sendSocialAiReply).toHaveBeenCalledTimes(1)
   })
 
   it('does not generate a reply for an unselected channel', async () => {
