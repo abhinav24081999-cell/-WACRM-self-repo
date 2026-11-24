@@ -57,13 +57,10 @@ vi.mock('./admin-client', () => ({
         return chain
       }
       // conversations
-      return {
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () =>
-              Promise.resolve({ data: h.state.conv, error: null }),
-          }),
-        }),
+      const conversation = {
+        select: () => conversation,
+        eq: () => conversation,
+        maybeSingle: () => Promise.resolve({ data: h.state.conv, error: null }),
         update: (payload: Record<string, unknown>) => {
           h.state.updatePayload = { ...h.state.updatePayload, ...payload }
           const record = { payload, isNull: [] as string[] }
@@ -78,6 +75,7 @@ vi.mock('./admin-client', () => ({
           return { eq: () => filter }
         },
       }
+      return conversation
     },
     rpc: (name: string, args: unknown) => {
       h.state.rpcCalls.push({ name, args })
@@ -193,6 +191,14 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     h.state.latestInbound = [{ message_id: 'wamid.inbound-1' }]
     await dispatchInboundToAiReply(ARGS)
     expect(h.engineSendText).toHaveBeenCalledTimes(1)
+  })
+
+  it('discards a Gemini reply generated while the workspace switched to n8n', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ provider: 'n8n' }))
+    h.loadAiConfig.mockResolvedValueOnce(aiConfig({ provider: 'gemini' }))
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.rpcCalls).toHaveLength(0)
+    expect(h.engineSendText).not.toHaveBeenCalled()
   })
 
   it('skips when AI is off / not configured', async () => {
@@ -313,6 +319,13 @@ describe('dispatchInboundToAiReply — typing indicator (#527)', () => {
 })
 
 describe('dispatchInboundToAiReply — handoff', () => {
+  it('keeps a newer customer message from being preempted by an old handoff', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: true })
+    h.state.latestInbound = [{ message_id: 'wamid.inbound-2' }]
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.updates).toHaveLength(0)
+  })
+
   it('disables auto-reply, writes a summary, and does not send on handoff', async () => {
     h.generateReply.mockResolvedValue({ text: '', handoff: true })
     await dispatchInboundToAiReply(ARGS)

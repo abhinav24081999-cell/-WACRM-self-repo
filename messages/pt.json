@@ -3193,6 +3193,7 @@
       "pausedRequired": "paused (booleano) é obrigatório",
       "updateConversationFailed": "Falha ao atualizar a conversa",
       "loadConfigFailed": "Falha ao carregar a configuração de IA",
+      "configSchemaNotReady": "As configurações de IA ficarão disponíveis após a atualização do banco de dados. Entre em contato com o administrador do WACRM.",
       "providerInvalid": "Selecione um provedor de IA compatível.",
       "baseUrlRequired": "base_url é obrigatório para openai_compatible",
       "baseUrlInvalid": "base_url deve ser uma URL http(s) válida",

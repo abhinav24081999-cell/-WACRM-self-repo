@@ -4,6 +4,7 @@ const h = vi.hoisted(() => ({
   stored: null as Record<string, unknown> | null,
   validateCalls: [] as { provider: string; apiKey: string; baseUrl: string | null }[],
   updates: [] as Record<string, unknown>[],
+  insertError: null as { code: string; message: string } | null,
 }))
 
 vi.mock('next/server', () => ({
@@ -25,6 +26,7 @@ vi.mock('@/lib/auth/account', () => ({
     role: 'admin',
     supabase: {
       from: () => ({
+        insert: async () => ({ error: h.insertError }),
         select: () => ({
           eq: () => ({
             maybeSingle: async () => ({ data: h.stored, error: null }),
@@ -76,12 +78,28 @@ beforeEach(() => {
   __resetRateLimitForTests()
   h.validateCalls = []
   h.updates = []
+  h.insertError = null
   h.stored = {
     id: 'cfg-1',
     provider: 'openai_compatible',
     model: 'm',
     base_url: 'https://8.8.8.8/v1',
     api_key: 'enc-key',
+  }
+})
+
+it('reports a missing configuration migration after the Gemini key validates', async () => {
+  h.stored = null
+  h.insertError = { code: 'PGRST204', message: 'agent_language missing' }
+  const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const response = await post({ provider: 'gemini', model: 'gemini-test', api_key: 'test-key' })
+    expect(h.validateCalls).toHaveLength(1)
+    expect(response.status).toBe(503)
+    expect(response.body.code).toBe('ai_schema_not_ready')
+    expect(response.body.error).not.toContain('agent_language')
+  } finally {
+    errorLog.mockRestore()
   }
 })
 

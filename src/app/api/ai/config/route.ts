@@ -21,6 +21,17 @@ function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 })
 }
 
+function databaseError(operation: string, code: string, fallback: string) {
+  console.error(`[ai/config] ${operation} failed`, { code })
+  if (['42703', '42P01', 'PGRST204', 'PGRST205'].includes(code)) {
+    return NextResponse.json(
+      { error: t('ai.configSchemaNotReady'), code: 'ai_schema_not_ready' },
+      { status: 503 },
+    )
+  }
+  return NextResponse.json({ error: fallback }, { status: 500 })
+}
+
 /**
  * GET /api/ai/config
  *
@@ -42,13 +53,7 @@ export async function GET() {
       .eq('account_id', accountId)
       .maybeSingle()
 
-    if (error) {
-      console.error('[ai/config GET] fetch error:', error)
-      return NextResponse.json(
-        { error: t('ai.loadConfigFailed') },
-        { status: 500 },
-      )
-    }
+    if (error) return databaseError('load', error.code, t('ai.loadConfigFailed'))
 
     if (!data) return NextResponse.json({ configured: false })
     // The keys are selected only to derive the has_* flags; neither is
@@ -152,11 +157,12 @@ export async function POST(request: Request) {
     const clearEmbeddingsKey = body.embeddings_api_key === null
 
     // Reuse the stored key when the form didn't send a fresh one.
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('ai_configs')
       .select('id, provider, model, base_url, api_key')
       .eq('account_id', accountId)
       .maybeSingle()
+    if (existingError) return databaseError('read before save', existingError.code, t('ai.saveConfigFailed'))
 
     let apiKeyPlain: string
     let baseUrl: string | null = null
@@ -271,13 +277,7 @@ export async function POST(request: Request) {
         .from('ai_configs')
         .update(encryptedKey ? { ...shared, api_key: encryptedKey } : shared)
         .eq('account_id', accountId)
-      if (upErr) {
-        console.error('[ai/config POST] update error:', upErr)
-        return NextResponse.json(
-          { error: t('ai.saveConfigFailed') },
-          { status: 500 },
-        )
-      }
+      if (upErr) return databaseError('update', upErr.code, t('ai.saveConfigFailed'))
     } else {
       const { error: insErr } = await supabase.from('ai_configs').insert({
         account_id: accountId,
@@ -285,13 +285,7 @@ export async function POST(request: Request) {
         api_key: encryptedKey, // guaranteed non-null: rawKey required when no existing row
         ...shared,
       })
-      if (insErr) {
-        console.error('[ai/config POST] insert error:', insErr)
-        return NextResponse.json(
-          { error: t('ai.saveConfigFailed') },
-          { status: 500 },
-        )
-      }
+      if (insErr) return databaseError('insert', insErr.code, t('ai.saveConfigFailed'))
     }
 
     return NextResponse.json({ success: true })
@@ -313,13 +307,7 @@ export async function DELETE() {
       .from('ai_configs')
       .delete()
       .eq('account_id', accountId)
-    if (error) {
-      console.error('[ai/config DELETE] error:', error)
-      return NextResponse.json(
-        { error: t('ai.deleteConfigFailed') },
-        { status: 500 },
-      )
-    }
+    if (error) return databaseError('delete', error.code, t('ai.deleteConfigFailed'))
     return NextResponse.json({ success: true })
   } catch (err) {
     return toErrorResponse(err)

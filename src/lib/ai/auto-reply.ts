@@ -84,6 +84,7 @@ export async function dispatchInboundToAiReply(
     const { data: conv, error: convErr } = await db
       .from('conversations')
       .select('assigned_agent_id, ai_autoreply_disabled, ai_reply_count')
+      .eq('account_id', accountId)
       .eq('id', conversationId)
       .maybeSingle()
     if (convErr || !conv) return
@@ -158,12 +159,12 @@ export async function dispatchInboundToAiReply(
       usage,
     })
 
-    if (config.provider === 'n8n' || assessment) {
-      const current = await loadAiConfig(db, accountId)
-      if (!current?.autoReplyEnabled || current.provider !== config.provider ||
-          current.baseUrl !== config.baseUrl || current.apiKey !== config.apiKey ||
-          current.model !== config.model || current.qualificationCriteria !== config.qualificationCriteria) return
-    }
+    const current = await loadAiConfig(db, accountId)
+    if (!current?.autoReplyEnabled || current.provider !== config.provider ||
+        current.baseUrl !== config.baseUrl || current.apiKey !== config.apiKey ||
+        current.model !== config.model || current.qualificationCriteria !== config.qualificationCriteria) return
+
+    if (inboundMessageId && !(await isLatestInbound(db, conversationId, inboundMessageId))) return
 
     if (assessment && inboundMessageId) {
       const { error } = await db.rpc('record_ai_contact_assessment', {
@@ -205,13 +206,6 @@ export async function dispatchInboundToAiReply(
       return
     }
 
-    if (
-      inboundMessageId &&
-      (await hasNewerInbound(db, conversationId, inboundMessageId))
-    ) {
-      return
-    }
-
     // Atomically claim a reply slot: the cap check + increment happen in
     // one UPDATE, so concurrent inbounds can never overshoot the cap. If
     // another inbound just took the last slot, `claimed` is false and we
@@ -221,7 +215,7 @@ export async function dispatchInboundToAiReply(
       'claim_ai_reply_slot',
       {
         conversation_id: conversationId,
-        max_replies: config.autoReplyMaxPerConversation,
+        max_replies: current.autoReplyMaxPerConversation,
       },
     )
     if (claimErr) {
@@ -247,7 +241,7 @@ export async function dispatchInboundToAiReply(
   }
 }
 
-async function hasNewerInbound(
+async function isLatestInbound(
   db: ReturnType<typeof supabaseAdmin>,
   conversationId: string,
   inboundMessageId: string,
@@ -258,9 +252,9 @@ async function hasNewerInbound(
     .eq('conversation_id', conversationId)
     .eq('sender_type', 'customer')
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
-  if (error || !data || data.length === 0) return false
-  return data[0].message_id !== inboundMessageId
+  return !error && data?.[0]?.message_id === inboundMessageId
 }
 
 /**
