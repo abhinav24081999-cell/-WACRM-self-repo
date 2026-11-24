@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { generateOpenAiCompatible, normalizeOpenAiCompatibleBaseUrl } from './openai-compatible'
+import { postWebhook } from '@/lib/webhooks/post'
+
+vi.mock('@/lib/webhooks/post', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/lib/webhooks/post')>()
+  return { ...original, postWebhook: vi.fn(original.postWebhook) }
+})
 
 describe('normalizeOpenAiCompatibleBaseUrl', () => {
   it('appends /chat/completions to a base URL', () => {
@@ -137,9 +143,8 @@ describe('generateOpenAiCompatible', () => {
     }
   })
 
-  it('uses manual redirects', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 302 }))
-    vi.stubGlobal('fetch', fetchMock)
+  it('treats hosted provider redirects as errors without contacting the next destination', async () => {
+    vi.mocked(postWebhook).mockResolvedValueOnce({ status: 302, body: '' })
 
     await expect(
       generateOpenAiCompatible({
@@ -152,6 +157,12 @@ describe('generateOpenAiCompatible', () => {
       }),
     ).rejects.toMatchObject({ code: 'provider_error' })
 
-    expect(fetchMock.mock.calls[0][1].redirect).toBe('manual')
+    expect(postWebhook).toHaveBeenLastCalledWith(
+      'https://8.8.8.8/v1/chat/completions',
+      expect.objectContaining({ Authorization: 'Bearer test-key' }),
+      expect.any(String),
+      1000,
+      true,
+    )
   })
 })
