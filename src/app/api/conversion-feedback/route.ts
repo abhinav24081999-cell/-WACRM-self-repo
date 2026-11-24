@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { accountId } = await requireRole('admin')
+    const { accountId } = await requireRole('admin', 'capi')
     if (feedbackWorkspace() !== accountId) return Response.json({ error: 'workspace_not_configured' }, { status: 503 })
     if (request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') {
       return new Response(null, { status: 415 })

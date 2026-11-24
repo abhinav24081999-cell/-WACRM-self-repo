@@ -39,7 +39,7 @@ function rpcErrorToResponse(err: PostgrestError): NextResponse {
   if (err.code === "22023") {
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
-  if (err.code === "23505") {
+  if (err.code === "23505" || (err.code === "23514" && err.message.startsWith("Workspace plan limit"))) {
     return NextResponse.json({ error: err.message }, { status: 409 });
   }
   console.error("[redeem] unexpected RPC error:", err);

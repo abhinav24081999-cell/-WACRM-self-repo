@@ -1,4 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('@/lib/auth/workspace-entitlements', () => ({
+  workspaceActionAllowed: async () => true,
+  workspaceFeatureAllowed: async () => true,
+}));
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // decrypt is identity in tests so we don't depend on real ciphertext.

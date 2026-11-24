@@ -31,6 +31,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { hasMinRole, isAccountRole, type AccountRole } from "./roles";
 import { getT } from "@/lib/i18n/translate";
+import { workspaceActionAllowed, workspaceFeatureAllowed } from "./workspace-entitlements";
+import { PLAN_FEATURES, ROLE_ACTIONS, type PlanFeature, type WorkspaceAction } from "./workspace-plan";
 
 const t = getT("LibErrors.auth");
 
@@ -182,12 +184,20 @@ export async function getCurrentAccount(): Promise<AccountContext> {
  * `getCurrentAccount`, plus `ForbiddenError("Insufficient role")`
  * when the caller is below `min`.
  */
-export async function requireRole(min: AccountRole): Promise<AccountContext> {
+export async function requireRole(min: AccountRole, access?: PlanFeature | WorkspaceAction): Promise<AccountContext> {
   const ctx = await getCurrentAccount();
   if (!hasMinRole(ctx.role, min)) {
     throw new ForbiddenError(
       t("requiresRole", { min: t(`roleNames.${min}`) }),
     );
+  }
+  if (access && (
+    (ROLE_ACTIONS.includes(access as WorkspaceAction) &&
+      !(await workspaceActionAllowed(ctx.supabase, ctx.accountId, access as WorkspaceAction))) ||
+    (PLAN_FEATURES.includes(access as PlanFeature) &&
+      !(await workspaceFeatureAllowed(ctx.supabase, ctx.accountId, access as PlanFeature)))
+  )) {
+    throw new ForbiddenError(getT("WorkspacePlans")("accessLimited"));
   }
   return ctx;
 }

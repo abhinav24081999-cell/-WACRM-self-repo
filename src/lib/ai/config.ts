@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt } from '@/lib/whatsapp/encryption'
+import { workspaceFeatureAllowed } from '@/lib/auth/workspace-entitlements'
 import type { AiConfig } from './types'
 
 interface AiConfigRow {
@@ -45,7 +46,7 @@ export async function loadAiConfig(
     .maybeSingle()
 
   if (error) throw error
-  if (!data) return null
+  if (!data || !(await workspaceFeatureAllowed(db, accountId, 'ai'))) return null
 
   const row = data as AiConfigRow
   // The Playground passes requireActive:false so an admin can test the
@@ -110,7 +111,7 @@ export async function loadEmbeddingsKey(
     .select('embeddings_api_key')
     .eq('account_id', accountId)
     .maybeSingle()
-  if (error || !data?.embeddings_api_key) return { key: null, corrupt: false }
+  if (error || !data?.embeddings_api_key || !(await workspaceFeatureAllowed(db, accountId, 'ai'))) return { key: null, corrupt: false }
   try {
     return { key: decrypt(data.embeddings_api_key), corrupt: false }
   } catch {

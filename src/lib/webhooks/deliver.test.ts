@@ -1,4 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('@/lib/auth/workspace-entitlements', () => ({
+  workspaceActionAllowed: async () => true,
+  workspaceFeatureAllowed: async () => true,
+}));
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 vi.mock('@/lib/whatsapp/encryption', () => ({

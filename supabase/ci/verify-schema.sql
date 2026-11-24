@@ -16,6 +16,11 @@ DECLARE
   v_customer uuid := gen_random_uuid();
   v_actor uuid := gen_random_uuid();
   v_workspace uuid;
+  v_plan uuid;
+  v_staff uuid := gen_random_uuid();
+  v_payment uuid := gen_random_uuid();
+  v_today date;
+  v_payment_payload jsonb;
 BEGIN
   -- The core tables, from 001.
   IF to_regclass('public.messages') IS NULL THEN
@@ -215,6 +220,65 @@ BEGIN
       RAISE EXCEPTION 'Platform audit or searchable workspace directory did not reflect the saved rename';
     END IF;
 
+    INSERT INTO public.platform_plans (name, monthly_price_paise, yearly_price_paise, max_contacts, max_team, features)
+    VALUES ('Phase 3 check', 10000, 100000, 0, 1, ARRAY['campaigns'])
+    RETURNING id INTO v_plan;
+    IF public.platform_assign_workspace_plan(v_workspace, v_plan, v_actor, 1, NULL, NULL, NULL)
+      IS DISTINCT FROM 'saved' THEN
+      RAISE EXCEPTION 'Platform plan assignment did not succeed';
+    END IF;
+    IF public.workspace_feature_allowed(v_workspace, 'api')
+      OR NOT public.workspace_feature_allowed(v_workspace, 'campaigns') THEN
+      RAISE EXCEPTION 'Workspace plan features were not applied';
+    END IF;
+
+    INSERT INTO public.contacts (user_id, account_id, phone) VALUES (v_customer, v_workspace, '15550000031');
+    BEGIN
+      INSERT INTO public.contacts (user_id, account_id, phone) VALUES (v_customer, v_workspace, '15550000032');
+      RAISE EXCEPTION 'Workspace contact limit was not enforced';
+    EXCEPTION WHEN check_violation THEN
+      IF SQLERRM NOT LIKE 'Workspace plan limit%' THEN RAISE; END IF;
+    END;
+
+    INSERT INTO auth.users (id, email, raw_user_meta_data)
+    VALUES (v_staff, 'phase3-staff@example.test', '{"full_name":"Phase 3 staff"}');
+    UPDATE auth.users SET raw_app_meta_data = jsonb_build_object(
+      'wacrm_staff_assignment', jsonb_build_object('account_id', v_workspace, 'role', 'agent', 'actor_id', v_customer)
+    ) WHERE id = v_staff;
+    IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE user_id = v_staff AND account_id = v_workspace AND account_role = 'agent')
+      OR NOT EXISTS (SELECT 1 FROM public.workspace_staff_provisioning_log WHERE user_id = v_staff AND actor_user_id = v_customer)
+      OR EXISTS (SELECT 1 FROM public.accounts WHERE owner_user_id = v_staff) THEN
+      RAISE EXCEPTION 'Staff provisioning did not create the audited workspace membership';
+    END IF;
+
+    v_today := private.commercial_today();
+    IF public.platform_save_commercial(v_workspace, v_actor, 'subscription_saved',
+      jsonb_build_object('access_type','trial','starts_on',v_today-7,'ends_on',v_today-1,
+        'suspended',false,'expected_updated_at',NULL)) IS DISTINCT FROM 'saved' THEN
+      RAISE EXCEPTION 'Could not save workspace access';
+    END IF;
+    PERFORM set_config('request.jwt.claim.sub', v_staff::text, true);
+    IF public.current_workspace_access() IS DISTINCT FROM 'expired'
+      OR public.is_account_member(v_workspace, 'viewer')
+      OR public.workspace_feature_allowed(v_workspace, 'campaigns') THEN
+      RAISE EXCEPTION 'An expired workspace retained CRM access';
+    END IF;
+    PERFORM set_config('request.jwt.claim.sub', '', true);
+    v_payment_payload := jsonb_build_object('id',v_payment,'amount_paise',12500,'received_on',v_today,'reference','ci-payment');
+    IF public.platform_save_commercial(v_workspace,v_actor,'payment_recorded',v_payment_payload) IS DISTINCT FROM 'saved'
+      OR public.platform_save_commercial(v_workspace,v_actor,'payment_recorded',v_payment_payload) IS DISTINCT FROM 'saved' THEN
+      RAISE EXCEPTION 'Payment could not be recorded or retried';
+    END IF;
+    IF (SELECT count(*) FROM public.workspace_payments WHERE account_id = v_workspace) <> 1 THEN
+      RAISE EXCEPTION 'Payment retries produced inconsistent ledger entries';
+    END IF;
+    IF public.platform_save_commercial(v_workspace,v_actor,'payment_voided',jsonb_build_object('id',v_payment)) IS DISTINCT FROM 'saved' THEN
+      RAISE EXCEPTION 'Payment could not be voided';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.workspace_payments WHERE id=v_payment AND voided_at IS NOT NULL) THEN
+      RAISE EXCEPTION 'Voiding a payment failed to preserve the ledger entry';
+    END IF;
+
     RAISE SQLSTATE 'P1010';
   EXCEPTION WHEN SQLSTATE 'P1010' THEN
     NULL;
@@ -225,6 +289,15 @@ BEGIN
     OR has_function_privilege('anon', 'public.platform_admin_snapshot(text,integer)', 'EXECUTE')
     OR has_function_privilege('authenticated', 'public.platform_admin_snapshot(text,integer)', 'EXECUTE') THEN
     RAISE EXCEPTION 'Platform workspace management grants are too broad';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.platform_plans', 'SELECT')
+    OR has_function_privilege('authenticated', 'public.platform_assign_workspace_plan(uuid,uuid,uuid,integer,integer,integer,text[])', 'EXECUTE')
+    OR has_function_privilege('anon', 'public.workspace_feature_allowed(uuid,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Workspace plan management grants are too broad';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.workspace_payments', 'SELECT')
+    OR has_function_privilege('authenticated', 'public.platform_save_commercial(uuid,uuid,text,jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Workspace billing grants are too broad';
   END IF;
 
   RAISE NOTICE 'schema verification passed';

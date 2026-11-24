@@ -75,6 +75,8 @@ import {
 import { InviteMemberDialog } from './invite-member-dialog';
 import { SettingsPanelHead } from './settings-panel-head';
 import { ROLE_META } from './role-meta';
+import { RolePermissions } from './role-permissions';
+import { ProvisionUserForm } from '@/components/users/provision-user-form';
 
 interface Member {
   user_id: string;
@@ -127,7 +129,8 @@ function fmtExpiresIn(iso: string, t: (key: string, values?: Record<string, stri
 export function MembersTab() {
   const t = useTranslations('Settings.members');
   const tRoles = useTranslations('Settings.roles');
-  const { user, canManageMembers } = useAuth();
+  const tStaff = useTranslations('WorkspacePlans');
+  const { user, canManageMembers, accountRole } = useAuth();
   const { getPresence, getRow, now } = usePresence();
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -135,6 +138,8 @@ export function MembersTab() {
   const [loading, setLoading] = useState(true);
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [createStaffOpen, setCreateStaffOpen] = useState(false);
+  const [staffReadOnly, setStaffReadOnly] = useState(true);
   const [removingMember, setRemovingMember] = useState<Member | null>(null);
   const [pendingMemberAction, setPendingMemberAction] = useState<string | null>(
     null,
@@ -154,8 +159,9 @@ export function MembersTab() {
         toast.error(payload.error || t('loadFailed'));
         return;
       }
-      const mdata = (await mres.json()) as { members: Member[] };
+      const mdata = (await mres.json()) as { members: Member[]; readOnly?: boolean };
       setMembers(mdata.members);
+      setStaffReadOnly(mdata.readOnly !== false);
 
       if (ires) {
         if (!ires.ok) {
@@ -287,10 +293,13 @@ export function MembersTab() {
         description={t('description')}
         action={
           <RequireRole min="admin">
+            <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setCreateStaffOpen(true)}>{tStaff('createStaff')}</Button>
             <Button onClick={() => setInviteOpen(true)}>
               <Plus className="size-4" />
               {t('inviteMember')}
             </Button>
+            </div>
           </RequireRole>
         }
       />
@@ -320,6 +329,17 @@ export function MembersTab() {
             </div>
           );
         })()}
+
+      {accountRole === 'owner' && <RolePermissions />}
+      <Dialog open={createStaffOpen} onOpenChange={setCreateStaffOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="pr-7">
+            <DialogTitle>{tStaff('createStaff')}</DialogTitle>
+            <DialogDescription>{tStaff('staffHelp')}</DialogDescription>
+          </DialogHeader>
+          <ProvisionUserForm staff readOnly={staffReadOnly} onCreated={() => void loadEverything()} />
+        </DialogContent>
+      </Dialog>
 
       {/* Roster */}
       <Card>
