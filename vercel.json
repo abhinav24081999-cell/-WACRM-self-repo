@@ -1,1 +1,5 @@
-{"git":{"deploymentEnabled":{"fix/audit-02-private-chat-media":false,"fix/audit-03-preview-isolation":false}},"crons":[{"path":"/api/conversion-feedback/cron","schedule":"0 2 * * *"}]}
+{
+  "crons": [
+    { "path": "/api/conversion-feedback/cron", "schedule": "0 2 * * *" }
+  ]
+}

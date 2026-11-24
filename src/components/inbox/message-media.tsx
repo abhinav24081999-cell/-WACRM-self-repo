@@ -16,6 +16,7 @@ import type { Message } from "@/types";
 import { downloadMediaMessage } from "@/lib/media/download";
 import { shouldDownloadDocumentClick } from "@/lib/media/document-click";
 import { useMediaBlobUrl } from "@/hooks/use-media-blob-url";
+import { chatMediaReadUrl } from "@/lib/media/chat-storage";
 
 /**
  * The media renderers behind `<MessageBubble>`'s image / video / audio /
@@ -122,7 +123,7 @@ export function MediaImageBubble({
   onOpen?: () => void;
   t: Translator;
 }) {
-  const { src, status } = useMediaBlobUrl(message.media_url);
+  const { src, status } = useMediaBlobUrl(chatMediaReadUrl(message.media_url));
   // The fetch can succeed and the bytes still not be a decodable image.
   const [broken, setBroken] = useState(false);
   const { downloading, download } = useMediaDownload(message, t);
@@ -197,7 +198,7 @@ export function MediaVideoBubble({
       {/* Plain URL, not a blob: the element should stream rather than wait
           for up to 16 MB to land. */}
       <video
-        src={message.media_url}
+        src={chatMediaReadUrl(message.media_url)}
         controls
         preload="metadata"
         className={cn(MEDIA_BOX, "rounded-lg")}
@@ -235,7 +236,7 @@ export function MediaAudioBubble({
 
   return (
     <div className="flex items-center gap-2">
-      <audio src={message.media_url} controls className="max-w-60" />
+      <audio src={chatMediaReadUrl(message.media_url)} controls className="max-w-60" />
       <MediaActionButton
         icon={Download}
         label={t("download")}
@@ -258,7 +259,7 @@ export function MediaDocumentBubble({
   return (
     <div className="flex items-center gap-2">
       <a
-        href={message.media_url}
+        href={chatMediaReadUrl(message.media_url)}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => {

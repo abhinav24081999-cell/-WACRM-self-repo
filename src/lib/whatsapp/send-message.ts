@@ -20,6 +20,7 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { CHAT_MEDIA_BUCKET, chatStoragePath, isAccountChatPath } from '@/lib/media/chat-storage';
 
 import {
   sendTextMessage,
@@ -343,6 +344,19 @@ export async function sendMessageToConversation(
     sendLanguage = resolved.language;
   }
 
+  let providerMediaUrl = mediaUrl;
+  const storagePath = isMediaKind ? chatStoragePath(mediaUrl) : null;
+  if (storagePath !== null) {
+    if (!isAccountChatPath(storagePath, accountId)) {
+      throw new SendMessageError('not_found', 'Chat attachment not found', 404);
+    }
+    const { data, error } = await db.storage.from(CHAT_MEDIA_BUCKET).createSignedUrl(storagePath, 600);
+    if (error || !data?.signedUrl) {
+      throw new SendMessageError('bad_request', 'Chat attachment is unavailable', 400);
+    }
+    providerMediaUrl = data.signedUrl;
+  }
+
   const attempt = async (phone: string): Promise<string> => {
     if (messageType === 'template') {
       const result = await sendTemplateMessage({
@@ -364,7 +378,7 @@ export async function sendMessageToConversation(
         accessToken,
         to: phone,
         kind: messageType as MediaKind,
-        link: mediaUrl!,
+        link: providerMediaUrl!,
         caption: contentText || undefined,
         filename: filename || undefined,
         contextMessageId,
