@@ -47,6 +47,11 @@ function metaConfig(source: string) {
   return { dataset, token, businessAccount }
 }
 
+export function metaTestCode(source: string) {
+  const route = metaRoutes[source]
+  return route ? process.env[`CONVERSION_META_${route}_TEST_CODE`]?.trim() : undefined
+}
+
 function googleAccount() {
   return numeric(process.env.CONVERSION_GOOGLE_CUSTOMER_ID?.trim().replaceAll('-', ''))
 }
@@ -178,7 +183,7 @@ export async function sendConversion(event: ConversionEvent, googleToken: () => 
     throw new DeliveryError('meta_event_precedes_lead')
   }
   if (Date.now() - occurredAt > 7 * 24 * 60 * 60 * 1000) throw new DeliveryError('meta_event_expired')
-  const testCode = process.env[`CONVERSION_META_${metaRoutes[event.source]}_TEST_CODE`]?.trim()
+  const testCode = metaTestCode(event.source)
   if (event.test_mode && !testCode) throw new DeliveryError('meta_test_code_missing')
   const metaEvent = metaEventPayload(event)
   if (metaEvent.event_time > Math.floor(Date.now() / 1000)) throw new DeliveryError('meta_event_timestamp_pending', true)

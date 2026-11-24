@@ -26,6 +26,12 @@ to its subscriptions. The Page, workspace and app secret must match the
 Messenger configuration. Meta needs a callback reachable over HTTPS without
 Vercel's interactive login prompt.
 
+Callback verification uses the configured workspace, Page and verify token.
+Receiving submissions additionally requires the signing app secret and Page access
+token. In **Settings → Conversion Feedback**, the credential indicators show
+which steps are configured. A real Meta test lead and the Test Events response
+confirm delivery.
+
 The WhatsApp `messages` webhook already receives ad referral information. For
 Instagram and Messenger, keep `messages` and subscribe to `messaging_referrals`
 and `messaging_postbacks` where Meta exposes them. If Instagram uses the
