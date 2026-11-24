@@ -46,6 +46,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Typecheck MCP server with its own dependencies
+        run: npm ci --prefix mcp-server && npm run typecheck --prefix mcp-server
+
       - name: Test
         run: npm test
 
