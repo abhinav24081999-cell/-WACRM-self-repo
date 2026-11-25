@@ -4,17 +4,17 @@ Only workspace owners and admins can change the connection. A workspace uses one
 
 ## Google Gemini
 
-1. Open **Agents → Setup → Connection** and select **Google Gemini**.
-2. Paste your Gemini API key and select **Load Gemini models**. Choose a model and select **Test key**.
-3. Add business instructions in **Behaviour**. Open **Test and activate**, then select **Save and open test chat**.
+1. Open **Agents → Setup**. In **Provider & key**, select **Google Gemini** and follow **Get a Gemini API key** to Google AI Studio.
+2. Paste your Gemini API key and select **Load models**. Choose a model and select **Test connection**.
+3. Add business instructions in **Behaviour**, then select **Save and open test chat**.
 4. In **Playground**, try a sample conversation.
-5. Return to **Setup → Test and activate** and turn on the assistant and automatic replies when ready.
+5. Return to **Setup**. In **Activation**, turn on the assistant and automatic replies when ready, then select **Save settings**.
 
 ## External agent in n8n
 
 1. Use a **Webhook** node with method **POST** and **Header Auth**. Set the header name to `Authorization` and its value to `Bearer YOUR_SECRET`, using a random secret you control.
 2. Configure the Webhook node to respond via a **Respond to Webhook** node. Publish the workflow and copy its **Production URL**.
-3. In **Agents → Setup → Connection**, choose **External AI (n8n)**. Paste the URL and the secret without the `Bearer ` prefix. Select **Test workflow**, then save from **Test and activate**.
+3. In **Agents → Setup**, choose **External AI (n8n)** under **Provider & key**. Paste the URL and the secret without the `Bearer ` prefix. Select **Test workflow**, then **Save settings**.
 4. Try a synthetic conversation in **Playground**. Enable automatic replies only after the workflow behaves as expected.
 
 The Webhook node receives a JSON body with `version` (1), `correlation_id`, `mode` (`test` or `live`), `instructions`, and recent `messages` with `role` and `content`. Route `test` requests away from any workflow steps that write data or send messages. Process the conversation and return the result to WACRM within 20 seconds.
@@ -45,7 +45,7 @@ Each delivery contains a unique event ID and a timestamp. WACRM signs the timest
 
 ## Provider setup and knowledge
 
-From **Agents → Setup**, choose OpenAI, Anthropic, Gemini, OpenAI-compatible or External AI (n8n). The native providers use their own key and model. For a compatible provider, supply the gateway URL and a model it exposes. A saved key is masked in the settings form. Test the provider, save the configuration and use Playground before allowing live replies. The server checks workspace permissions and the plan's AI feature.
+From **Agents → Setup**, choose OpenAI, Anthropic, Gemini, OpenAI-compatible or External AI (n8n). The native providers use their own key and model. For a compatible provider, supply the gateway URL and a model it exposes. The settings form indicates when a saved key is in use. Test the provider, save the configuration and use Playground before allowing live replies. The server checks workspace permissions and the plan's AI feature.
 
 Add business instructions and manage knowledge in Setup. The knowledge base can use text search. Semantic retrieval requires a configured embeddings key and indexing. After editing the knowledge, try a question in Playground that should retrieve the updated answer. Review **Usage** for recorded calls, including draft, playground and automatic reply usage where present.
 
